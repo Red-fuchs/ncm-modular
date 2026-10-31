@@ -1,0 +1,99 @@
+== codec tinystories: seq_len=128; main n=150 texts, entities/text 6-8 (mean 7.1), occurrences/text mean 7.7; calib n=60
+example: Yordanka said, "Let us go to Stara Zagora on 22 August." Siobhan had $12,000, and Mlauzi had 7.2% toys for Tbilisi.
+
+slot-set search on calibration (score=exact+recall):
+  PER  A=0.726 B=0.737 C=0.737 -> B
+  LOC  A=0.737 B=0.981 C=1.044 -> C
+  NUM  A=1.044 B=0.990 C=0.860 -> A
+  DATE A=1.044 B=1.772 C=1.332 -> B
+  AMT  A=1.772 B=1.761 C=1.513 -> A
+
+TUNED surrogate table (first 8 per slot):
+  PER  set B: John, Mary, David, Sarah, James, Peter, Emma, Mark
+  LOC  set C: the park, the school, the town, the city, the shop, the lake, the farm, the zoo
+  NUM  set A: two, three, four, five, six, seven, eight, nine
+  DATE set B: January, February, March, April, May, June, July, August
+  AMT  set A: ten dollars, five pounds, twenty euros, two dollars, three pounds, four euros, six dollars, seven pounds
+
+### 1/2/5 main matrix (5-8 entities/text, repeats, mixed types)
+condition                         | exact% | recall | prec   | bind | cnt | chrsim | collisions
+baseline RAW entities             |   1.3% |  60.1% | 100.0% |    0 | 148 | 0.932 | -
+masked all-A                      |   0.0% |  75.1% |  96.3% |   50 | 140 | 0.860 | -
+masked all-B                      |  46.7% |  93.1% |  98.5% |   16 |  64 | 0.964 | -
+masked all-C                      |  18.7% |  81.1% | 100.0% |    0 | 122 | 0.927 | -
+masked TUNED                      |  76.0% |  98.9% |  99.1% |    0 |  23 | 0.988 | -
+masked TUNED, regex-detected spans|  40.7% |  96.5% |  98.6% |    0 |  42 | 0.965 | 4/6
+regex detector alone: span recall 86.3%, precision 91.6% (types PER/LOC conflated)
+
+### 3 collisions: 40 texts with 2 natural (non-entity) surrogate words each, e.g.
+  One day, Siobhan saw Hristo near Gdansk. Hristo gave Siobhan 7.2% apples and €80 on 14 May 2026. Only three of them stayed. It was cold last March.
+condition                         | exact% | recall | prec   | bind | cnt | chrsim | collisions
+static table (naive)              |  27.5% | 100.0% | 100.0% |    0 |   0 | 0.965 | 37/80
+dynamic table (skip words in input)|  77.5% |  99.5% |  99.5% |    1 |   2 | 0.995 | 0/80
+  static unmask(mask(x))==x without any codec: 11/40; dynamic: 40/40
+  the dynamic table needs >= 8+4 spare words/slot (12 provided)
+
+### 4 German control: 15 sentences, 44 entities (27 with umlaut/ss), 0 exceed seq_len; entities mean 2.9/sent
+condition                         | exact% | recall | prec   | bind | cnt | chrsim | collisions
+German RAW                        |   0.0% |  13.6% | 100.0% |    0 |  15 | 0.813 | -
+German masked umlaut-entities only|   0.0% |  88.9% | 100.0% |    0 |   3 | 0.859 | -
+German masked all entities        |   0.0% |  88.6% |  95.1% |    1 |   5 | 0.858 | -
+English main RAW (reference)      |   1.3% |  60.1% | 100.0% |    0 | 148 | 0.932 | -
+  GER REF Frau Müller wohnt seit 2019 in Düsseldorf.
+      MASK-IN Frau John wohnt seit two in the park.
+      OUT     Fuu Johnhhntpit 2019 in Düsseldorf.
+  GER REF Jürgen Weiß kauft am 3. März ein Auto für 12.500 Euro.
+      MASK-IN John kauft am January ein Auto für ten dollars.
+      OUT     Jürgen Weiß kauft am Januaryinin Auto f� playr 12.500 Euro.
+  GER REF Björn und Käthe fahren nach Nürnberg.
+      MASK-IN John und Mary fahren nach the park.
+      OUT     Björn attach Maryhhh nach Nürnberg.
+  GER REF Herr Köhler zahlte 340 Euro für die Reparatur in Würzburg.
+      MASK-IN Herr John zahlte ten dollars für die Reparatur in the park.
+      OUT     Herr Köhler zahlte 340 Euro f�.r die Reparatur in Würzburg.
+
+### failure examples (REF -> OUT after unmask)
+[baseline RAW entities] 148/150 texts not exact
+  REF Yordanka said, "Let us go to Stara Zagora on 22 August." Siobhan had $12,000, and Mlauzi had 7.2% toys for Tbilisi.
+  IN  Yordanka said, "Let us go to Stara Zagora on 22 August." Siobhan had $12,000, and Mlauzi had 7.2% toys for Tbilisi.
+  OUT Yellanka said, "Let us go to Stara Zagora on 12 August." Siobhan had $12,000, and Mlauzi had 4.22 toys for Tbilili.
+  UNM Yellanka said, "Let us go to Stara Zagora on 12 August." Siobhan had $12,000, and Mlauzi had 4.22 toys for Tbilili.
+  REF Liam O'Connor and Okonkwo lived in Aberdeen. Liam O'Connor had 58 cats, Okonkwo had 340 dogs, and on 5 November they met Olena Kovalenko in Tbilisi.
+  IN  Liam O'Connor and Okonkwo lived in Aberdeen. Liam O'Connor had 58 cats, Okonkwo had 340 dogs, and on 5 November they met Olena Kovalenko in Tbilisi.
+  OUT Liam O'Connor and Oononkwo lived in Aardeen. Liam''Connor had 58 cats, Okonkwo had 340 dogs, and on 5 Novemm they met Olena Kovalenko in Tbilisi.
+  UNM Liam O'Connor and Oononkwo lived in Aardeen. Liam''Connor had 58 cats, Okonkwo had 340 dogs, and on 5 Novemm they met Olena Kovalenko in Tbilisi.
+  REF Ngozi took 340 birds to Veliko Tarnovo and 58 to Cardiff. Aurelio paid $7.50 on 3 March.
+  IN  Ngozi took 340 birds to Veliko Tarnovo and 58 to Cardiff. Aurelio paid $7.50 on 3 March.
+  OUT Ngozi took 340 birds to Veliko Toovo and 5 5 to Cchiff. Aurelio paid $ 2.50 on 3 March.
+  UNM Ngozi took 340 birds to Veliko Toovo and 5 5 to Cchiff. Aurelio paid $ 2.50 on 3 March.
+  REF Okonkwo met Tomasz Nowak on 2026-10-30, 5 November and 1 January in Aberdeen.
+  IN  Okonkwo met Tomasz Nowak on 2026-10-30, 5 November and 1 January in Aberdeen.
+  OUT Okonkwo met Tomas. Nowak on 20 16-10-30, 5 Novemi and 1 January in Aardeen.
+  UNM Okonkwo met Tomas. Nowak on 20 16-10-30, 5 Novemi and 1 January in Aardeen.
+  REF Ngozi and Priya Nair went to Stara Zagora on 1 January. Ngozi found 15% coins and gave 4.5 to Liam O'Connor.
+  IN  Ngozi and Priya Nair went to Stara Zagora on 1 January. Ngozi found 15% coins and gave 4.5 to Liam O'Connor.
+  OUT Ngozi and Priya Nair went to Stara Zagora on 1 January. Ngozi found 15 and coins and gave 4.5 to Liam O'Connor.
+  UNM Ngozi and Priya Nair went to Stara Zagora on 1 January. Ngozi found 15 and coins and gave 4.5 to Liam O'Connor.
+[TUNED] 36/150 texts not exact
+  REF Ngozi took 340 birds to Veliko Tarnovo and 58 to Cardiff. Aurelio paid $7.50 on 3 March.
+  IN  John took two birds to the park and three to the school. Mary paid ten dollars on January.
+  OUT John took two birds to the park and three to the school. Mary pay ten dollars on January.
+  UNM Ngozi took 340 birds to Veliko Tarnovo and 58 to Cardiff. Aurelio pay $7.50 on 3 March.
+  REF Tbilisi, Cardiff, Veliko Tarnovo and Stara Zagora lost 15%, 17, 2,500 and 981.
+  IN  the park, the school, the town and the city lost two, three, four and five.
+  OUT the park, the school, the town and the city lost two two three, four and five.
+  UNM Tbilisi, Cardiff, Veliko Tarnovo and Stara Zagora lost 15% 15% 17, 2,500 and 981.
+  REF Okonkwo took 2,500 birds to Tbilisi and 15% to Lyon. Ishan paid 2.5 million dollars on 2026-10-30.
+  IN  John took two birds to the park and three to the school. Mary paid ten dollars on January.
+  OUT John took two birds to the park and three to the school. Mary pay ten dollars on January.
+  UNM Okonkwo took 2,500 birds to Tbilisi and 15% to Lyon. Ishan pay 2.5 million dollars on 2026-10-30.
+  REF Mohammed Rahman paid Ishan €80, Hristo $7.50 and Okonkwo 300 euros.
+  IN  John paid Mary ten dollars, David five pounds and Sarah twenty euros.
+  OUT John paid Mary ten dollars, David five pounds and Sarah twentyururos.
+  UNM Mohammed Rahman paid Ishan €80, Hristo $7.50 and Okonkwo twentyururos.
+  REF Okonkwo paid Priya Nair $12,000, Dragomir €80 and Sarah Collins $7.50.
+  IN  John paid Mary ten dollars, David five pounds and Sarah twenty euros.
+  OUT John paid Mary ten dollars, David five pounds and Sarah twentyururos.
+  UNM Okonkwo paid Priya Nair $12,000, Dragomir €80 and Sarah Collins twentyururos.
+
+verdict-metric: TUNED recall 98.87% (target >=99.5%), binding errors 0, count-err texts 23, spurious surrogate outputs 10

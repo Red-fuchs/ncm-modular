@@ -1,0 +1,8 @@
+w/
+upstream/
+__pycache__/
+*.safetensors
+*.pt
+*.npz
+*.npy
+.venv*/

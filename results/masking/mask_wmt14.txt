@@ -1,0 +1,67 @@
+== codec wmt14: seq_len=64; main n=150 texts, entities/text 6-8 (mean 6.8), occurrences/text mean 6.8; calib n=60
+example: Mr Yordanka and Mr Siobhan agreed that 7.2% experts from Veliko Tarnovo would meet in Stara Zagora on 5 November.
+
+slot-set search on calibration (score=exact+recall):
+  PER  A=1.905 B=2.000 C=2.000 -> B
+  LOC  A=2.000 B=2.000 C=2.000 -> A
+  NUM  A=2.000 B=2.000 C=2.000 -> A
+  DATE A=2.000 B=2.000 C=2.000 -> A
+  AMT  A=2.000 B=2.000 C=2.000 -> A
+
+TUNED surrogate table (first 8 per slot):
+  PER  set B: John, Mary, David, Sarah, James, Peter, Emma, Mark
+  LOC  set A: London, Paris, Berlin, Rome, Madrid, Dublin, Moscow, Tokyo
+  NUM  set A: two, three, four, five, six, seven, eight, nine
+  DATE set A: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday, yesterday
+  AMT  set A: ten dollars, five pounds, twenty euros, two dollars, three pounds, four euros, six dollars, seven pounds
+
+### 1/2/5 main matrix (5-8 entities/text, repeats, mixed types)
+condition                         | exact% | recall | prec   | bind | cnt | chrsim | collisions
+baseline RAW entities             |  63.3% |  94.0% |  99.8% |    3 |  53 | 0.983 | -
+masked all-A                      |  93.3% |  99.0% | 100.0% |    0 |  10 | 0.995 | -
+masked all-B                      | 100.0% | 100.0% | 100.0% |    0 |   0 | 1.000 | -
+masked all-C                      |  89.3% |  98.4% | 100.0% |    0 |  16 | 0.994 | -
+masked TUNED                      | 100.0% | 100.0% | 100.0% |    0 |   0 | 1.000 | -
+masked TUNED, regex-detected spans|  86.0% |  99.1% |  99.3% |    7 |   2 | 0.990 | 2/3
+regex detector alone: span recall 86.1%, precision 92.4% (types PER/LOC conflated)
+
+### 3 collisions: 40 texts with 2 natural (non-entity) surrogate words each, e.g.
+  Siobhan reported that Gdansk spent €80 in 14 May 2026, and Hristo asked why Stara Zagora spent 58 more. Only three of them stayed. It was cold last Wednesday.
+condition                         | exact% | recall | prec   | bind | cnt | chrsim | collisions
+static table (naive)              |  22.5% |  99.7% | 100.0% |    0 |   1 | 0.967 | 36/80
+dynamic table (skip words in input)|  92.5% |  99.7% | 100.0% |    0 |   1 | 0.998 | 0/80
+  static unmask(mask(x))==x without any codec: 11/40; dynamic: 40/40
+  the dynamic table needs >= 8+4 spare words/slot (12 provided)
+
+### 4 German control: 15 sentences, 44 entities (27 with umlaut/ss), 0 exceed seq_len; entities mean 2.9/sent
+condition                         | exact% | recall | prec   | bind | cnt | chrsim | collisions
+German RAW                        | 100.0% | 100.0% | 100.0% |    0 |   0 | 1.000 | -
+German masked umlaut-entities only|  93.3% | 100.0% | 100.0% |    0 |   0 | 0.997 | -
+German masked all entities        | 100.0% | 100.0% | 100.0% |    0 |   0 | 1.000 | -
+English main RAW (reference)      |  63.3% |  94.0% |  99.8% |    3 |  53 | 0.983 | -
+
+### failure examples (REF -> OUT after unmask)
+[baseline RAW entities] 55/150 texts not exact
+  REF Ishan paid Mlauzi 2.5 million dollars, Ngozi $7.50 and Okonkwo £4.5m.
+  IN  Ishan paid Mlauzi 2.5 million dollars, Ngozi $7.50 and Okonkwo £4.5m.
+  OUT Ishan paid Mlauzi 2.5 million dollars, kommerzi $7.50 and Okonkwo £4.5m.
+  UNM Ishan paid Mlauzi 2.5 million dollars, kommerzi $7.50 and Okonkwo £4.5m.
+  REF On 2026-10-30, Ngozi asked Priya Nair to visit Stara Zagora, where 15% members would discuss 300 euros for Tbilisi.
+  IN  On 2026-10-30, Ngozi asked Priya Nair to visit Stara Zagora, where 15% members would discuss 300 euros for Tbilisi.
+  OUT On 2026-10-30, prezzi asked Priya Nair to visit Stara Zagora, where 15% members would discuss 300 euros for Tbilisi.
+  UNM On 2026-10-30, prezzi asked Priya Nair to visit Stara Zagora, where 15% members would discuss 300 euros for Tbilisi.
+  REF Ngozi reported that Stara Zagora spent €80 in 22 August, and Priya Nair asked why Reykjavik spent 340 more.
+  IN  Ngozi reported that Stara Zagora spent €80 in 22 August, and Priya Nair asked why Reykjavik spent 340 more.
+  OUT Ngozi reported that Stora Zagora spent €80 in 22 August, and Priya Nair asked why Reykjavik spent 340 more.
+  UNM Ngozi reported that Stora Zagora spent €80 in 22 August, and Priya Nair asked why Reykjavik spent 340 more.
+  REF Priya Nair met Aurelio on 5 November, 14 May 2026 and 1 January in Plovdiv.
+  IN  Priya Nair met Aurelio on 5 November, 14 May 2026 and 1 January in Plovdiv.
+  OUT Mosya Nair met Aurelio on 5 November, 14 May 2026 and 1 January in Plovdiv.
+  UNM Mosya Nair met Aurelio on 5 November, 14 May 2026 and 1 January in Plovdiv.
+  REF On 22 August, Liam O'Connor asked Okonkwo to visit Reykjavik, where 58 members would discuss $7.50 for Gdansk.
+  IN  On 22 August, Liam O'Connor asked Okonkwo to visit Reykjavik, where 58 members would discuss $7.50 for Gdansk.
+  OUT On 22 August, HC O'Connor asked Okonkwo to visit Reykjavik, where 58 members would discuss $7.50 for Gdansk.
+  UNM On 22 August, HC O'Connor asked Okonkwo to visit Reykjavik, where 58 members would discuss $7.50 for Gdansk.
+[TUNED] 0/150 texts not exact
+
+verdict-metric: TUNED recall 100.00% (target >=99.5%), binding errors 0, count-err texts 0, spurious surrogate outputs 0

@@ -1,0 +1,79 @@
+== codec xsum: seq_len=48; main n=150 texts, entities/text 6-8 (mean 6.8), occurrences/text mean 7.1; calib n=60
+example: 7.2% people, including Yordanka, were hurt in Veliko Tarnovo on 5 November, Siobhan said, and $7.50 was lost near Stara Zagora.
+
+slot-set search on calibration (score=exact+recall):
+  PER  A=2.000 B=2.000 C=2.000 -> A
+  LOC  A=2.000 B=2.000 C=2.000 -> A
+  NUM  A=2.000 B=2.000 C=2.000 -> A
+  DATE A=2.000 B=2.000 C=2.000 -> A
+  AMT  A=2.000 B=2.000 C=2.000 -> A
+
+TUNED surrogate table (first 8 per slot):
+  PER  set A: Tom, Lily, Sam, Max, Anna, Ben, Mia, Jack
+  LOC  set A: London, Paris, Berlin, Rome, Madrid, Dublin, Moscow, Tokyo
+  NUM  set A: two, three, four, five, six, seven, eight, nine
+  DATE set A: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday, yesterday
+  AMT  set A: ten dollars, five pounds, twenty euros, two dollars, three pounds, four euros, six dollars, seven pounds
+
+### 1/2/5 main matrix (5-8 entities/text, repeats, mixed types)
+condition                         | exact% | recall | prec   | bind | cnt | chrsim | collisions
+baseline RAW entities             |  80.7% |  96.8% | 100.0% |    0 |  29 | 0.992 | -
+masked all-A                      | 100.0% | 100.0% | 100.0% |    0 |   0 | 1.000 | -
+masked all-B                      |  90.0% |  98.6% | 100.0% |    0 |  15 | 0.992 | -
+masked all-C                      | 100.0% | 100.0% | 100.0% |    0 |   0 | 1.000 | -
+masked TUNED                      | 100.0% | 100.0% | 100.0% |    0 |   0 | 1.000 | -
+masked TUNED, regex-detected spans|  92.7% |  99.3% |  99.5% |    3 |   2 | 0.995 | -
+regex detector alone: span recall 90.8%, precision 93.9% (types PER/LOC conflated)
+
+### 3 collisions: 40 texts with 2 natural (non-entity) surrogate words each, e.g.
+  Siobhan told Hristo that Gdansk would pay €80 by 14 May 2026, and Stara Zagora would send 58 staff. Only three of them stayed. It was cold last Wednesday.
+condition                         | exact% | recall | prec   | bind | cnt | chrsim | collisions
+static table (naive)              |  42.5% | 100.0% | 100.0% |    0 |   0 | 0.970 | 32/80
+dynamic table (skip words in input)| 100.0% | 100.0% | 100.0% |    0 |   0 | 1.000 | 0/80
+  static unmask(mask(x))==x without any codec: 17/40; dynamic: 40/40
+  the dynamic table needs >= 8+4 spare words/slot (12 provided)
+
+### 4 German control: 15 sentences, 44 entities (27 with umlaut/ss), 0 exceed seq_len; entities mean 2.9/sent
+condition                         | exact% | recall | prec   | bind | cnt | chrsim | collisions
+German RAW                        |  26.7% |  68.2% | 100.0% |    0 |  11 | 0.939 | -
+German masked umlaut-entities only|  46.7% | 100.0% | 100.0% |    0 |   0 | 0.958 | -
+German masked all entities        |  40.0% |  95.5% | 100.0% |    0 |   2 | 0.954 | -
+English main RAW (reference)      |  80.7% |  96.8% | 100.0% |    0 |  29 | 0.992 | -
+  GER REF Jürgen Weiß kauft am 3. März ein Auto für 12.500 Euro.
+      MASK-IN Tom kauft am Monday ein Auto für ten dollars.
+      OUT     Jürgen Weiß kauft am 3. März ein Auto f Top 12.500 Euro.
+  GER REF Herr Köhler zahlte 340 Euro für die Reparatur in Würzburg.
+      MASK-IN Herr Tom zahlte ten dollars für die Reparatur in London.
+      OUT     Herr Köhler zahlte pounds dollars f cruiser die Reparatur in Würzburg.
+  GER REF Die Straße in Göttingen ist seit Montag gesperrt.
+      MASK-IN Die Straße in London ist seit Monday gesperrt.
+      OUT     Die Stra Strae in Göttingen ist seit Montag gesperrt.
+  GER REF Anneliese Schröder hat 17 Äpfel aus Lübeck mitgebracht.
+      MASK-IN Tom hat two Äpfel aus London mitgebracht.
+      OUT     Anneliese Schröder hat 17 âpfel aus Lübeck,gebracht.
+
+### failure examples (REF -> OUT after unmask)
+[baseline RAW entities] 29/150 texts not exact
+  REF Ishan gave 15% to Liam O'Connor, 4.5 to Mohammed Rahman, and Ishan kept 7.2% for Plovdiv.
+  IN  Ishan gave 15% to Liam O'Connor, 4.5 to Mohammed Rahman, and Ishan kept 7.2% for Plovdiv.
+  OUT Ishan gave 15% to Liam O'Connor, 4.5 to Mohammed Rahman, and Ishan kept 6.2% for Plovdiv.
+  UNM Ishan gave 15% to Liam O'Connor, 4.5 to Mohammed Rahman, and Ishan kept 6.2% for Plovdiv.
+  REF Mohammed Rahman, Olena Kovalenko, Aurelio and Hristo met in Stara Zagora, Reykjavik and Lyon.
+  IN  Mohammed Rahman, Olena Kovalenko, Aurelio and Hristo met in Stara Zagora, Reykjavik and Lyon.
+  OUT Mohammed Rahman, Olena Kovalenko, Aurelio and Helfo met in Stara Zagora, Reykjavik and Lyon.
+  UNM Mohammed Rahman, Olena Kovalenko, Aurelio and Helfo met in Stara Zagora, Reykjavik and Lyon.
+  REF Wojciech and Okonkwo met in Nairobi on 3 March, and Wojciech left 17 days later for Veliko Tarnovo.
+  IN  Wojciech and Okonkwo met in Nairobi on 3 March, and Wojciech left 17 days later for Veliko Tarnovo.
+  OUT Wojciech and Okonkwo met in Nairobi on 3 March, and Wojciech left 17 days later forikoiko Tarnovo.
+  UNM Wojciech and Okonkwo met in Nairobi on 3 March, and Wojciech left 17 days later forikoiko Tarnovo.
+  REF Yordanka and Olena Kovalenko said Veliko Tarnovo lost 981 jobs after 12/07/2025, while Yordanka blamed Reykjavik for 2.5 million dollars.
+  IN  Yordanka and Olena Kovalenko said Veliko Tarnovo lost 981 jobs after 12/07/2025, while Yordanka blamed Reykjavik for 2.5 million dollars.
+  OUT Yordanka and Olena Kovalenko said Veliko Tarnovo lost 981 jobs after 12/07/2025, while Yord Trump blamed Reykjavik for 2.5 million dollars.
+  UNM Yordanka and Olena Kovalenko said Veliko Tarnovo lost 981 jobs after 12/07/2025, while Yord Trump blamed Reykjavik for 2.5 million dollars.
+  REF Priya Nair and Siobhan met in Lyon on 1 January, and Priya Nair left 340 days later for Stara Zagora.
+  IN  Priya Nair and Siobhan met in Lyon on 1 January, and Priya Nair left 340 days later for Stara Zagora.
+  OUT Kenya Nair and Siobhan met in Lyon on 1 January, and Priya Nair left 340 days later for Stara Zagora.
+  UNM Kenya Nair and Siobhan met in Lyon on 1 January, and Priya Nair left 340 days later for Stara Zagora.
+[TUNED] 0/150 texts not exact
+
+verdict-metric: TUNED recall 100.00% (target >=99.5%), binding errors 0, count-err texts 0, spurious surrogate outputs 0

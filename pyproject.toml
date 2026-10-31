@@ -1,0 +1,27 @@
+[project]
+name = "ncm-modular"
+version = "0.1.0"
+description = "MLX port of the NCM XSum/WMT14 codecs, surrogate masking, prefix-conditioned NCM generator training and a block-seam experiment (Apple Silicon)"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+  "mlx==0.32.3",
+  "numpy",
+  "safetensors",
+  "transformers",   # tokenizers (gpt2, Qwen3-0.6B) for codec round trips / MASSIVE pilot
+  "pyarrow",        # massive_build.py reads the MASSIVE parquet files
+  "ncm-mlx==0.2.0", # janmus1c/ncm-mlx (MIT): official TinyStories codec, Block/rope/BPE used by the seam + generator code
+]
+
+[project.urls]
+Homepage = "https://github.com/Red-fuchs/ncm-modular"
+Repository = "https://github.com/Red-fuchs/ncm-modular"
+"Hugging Face" = "https://huggingface.co/Red-fuchs/ncm-modular"
+
+[project.optional-dependencies]
+torch = ["torch", "omegaconf", "pyyaml"]   # only convert.py / ref_dump.py / ref_torch.py (needs a HazyResearch/ncm checkout via NCM_UPSTREAM)
+judge = ["mlx-lm"]                          # seam/judge.py
+
+[tool.setuptools]
+py-modules = []   # scripts, run as `python src/ncm_modular/<script>.py`; no installable package

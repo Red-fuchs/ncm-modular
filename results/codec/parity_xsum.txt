@@ -1,0 +1,26 @@
+--- xsum fp32: pre-quant z max|diff| 1.91e-06
+  level  0 (len  4) codes equal 100.00%  zhat max|diff| 6.44e-06
+  level  1 (len  6) codes equal 100.00%  zhat max|diff| 6.44e-06
+  level  2 (len 10) codes equal 100.00%  zhat max|diff| 6.44e-06
+  level  3 (len 14) codes equal 100.00%  zhat max|diff| 6.44e-06
+  level  4 (len 20) codes equal 100.00%  zhat max|diff| 6.44e-06
+  level  5 (len 26) codes equal 100.00%  zhat max|diff| 6.44e-06
+  level  6 (len 32) codes equal 100.00%  zhat max|diff| 1.34e-05
+  level  7 (len 40) codes equal 100.00%  zhat max|diff| 1.55e-05
+  level  8 (len 48) codes equal 100.00%  zhat max|diff| 1.50e-05
+  decoded ids per level equal: 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0
+  final decoded ids equal: 100.00%
+  decode-from-torch-codes: ids equal 100.00%  zhat max|diff| 1.50e-05
+--- xsum fp64: pre-quant z max|diff| 1.19e-06
+  level  0 (len  4) codes equal 100.00%  zhat max|diff| 5.33e-06
+  level  1 (len  6) codes equal 100.00%  zhat max|diff| 5.42e-06
+  level  2 (len 10) codes equal 100.00%  zhat max|diff| 5.52e-06
+  level  3 (len 14) codes equal 100.00%  zhat max|diff| 5.52e-06
+  level  4 (len 20) codes equal 100.00%  zhat max|diff| 5.25e-06
+  level  5 (len 26) codes equal 100.00%  zhat max|diff| 6.03e-06
+  level  6 (len 32) codes equal 100.00%  zhat max|diff| 1.36e-05
+  level  7 (len 40) codes equal 100.00%  zhat max|diff| 1.57e-05
+  level  8 (len 48) codes equal 100.00%  zhat max|diff| 1.53e-05
+  decoded ids per level equal: 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0
+  final decoded ids equal: 100.00%
+  decode-from-torch-codes: ids equal 100.00%  zhat max|diff| 1.53e-05

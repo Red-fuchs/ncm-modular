@@ -1,0 +1,43 @@
+== xsum: L=48 EOS=50256 PAD=50257 levels=[4, 6, 10, 14, 20, 26, 32, 40, 48]
+
+== xsum / (a) in-distribution news summaries: n=12 exact=92% entity_kept=97% (entities=33)
+  token acc per level: 0.31 0.45 0.54 0.64 0.79 0.89 0.96 0.99 1.00
+  REF Celtic have signed striker Kenji Furuta on a four-year deal from Vissel Kobe for an undisclosed fee.
+  OUT Celtic have signed striker Kenjijiuta on a four-year deal from Vissel Kobe for an undisclosed fee.
+  lost: ['Kenji Furuta']
+
+== xsum / (b) RAW rare names/places/numbers/dates: n=40 exact=55% entity_kept=89% (entities=170)
+  token acc per level: 0.12 0.19 0.32 0.44 0.55 0.67 0.79 0.88 0.98
+  REF One day, Anneliese Schröder found 4.5 coins near Reykjavik. Anneliese Schröder gave them to Stoyan Georgiev.
+  OUT One day, Anneliese Kouöder found 4.5 coins near Reykjavik. Anneliese Schröder gave them to Stoyan Georgiev.
+  REF Jürgen Müller went to Veliko Tarnovo with Björn Köhler. They had 2026 apples and ate them on 2026-10-30.
+  OUT J propegen Müller went to Tiko Tarnovo with Bj�n Köhler. They had 2026 apples and ate them on 2026-10-30.
+  REF One day, Jürgen Müller found 4.5 coins near Freiburg im Breisgau. Jürgen Müller gave them to Wojciech.
+  OUT One day, Jgengen Müller found 4.5 coins near Freiburg im Breisgau. Jgengen Müller gave them to Wojciech.
+  lost: ['Anneliese Schröder', 'Björn Köhler', 'Günther Weiß', 'Jürgen Müller', 'Veliko Tarnovo']
+
+== xsum / (c) common surrogates Tom/Lily/three: n=4 exact=100% entity_kept=100% (entities=17)
+  token acc per level: 0.19 0.22 0.30 0.53 0.71 0.77 0.91 0.96 1.00
+
+== xsum / (d) literal tags <P1>..: n=4 exact=0% entity_kept=0% (entities=17)
+  token acc per level: 0.10 0.14 0.22 0.32 0.41 0.52 0.57 0.63 0.70
+  REF <P1> went to <L1> with <P2>. They had <N1> apples and ate them on <D1>.
+  OUT SNP1ighth went to KouL1 Shame with yourselfP2 local They had-N1 affected apples and ate them on theD1!",
+  REF One day, <P1> found <N1> coins near <L1>. <P1> gave them to <P2>.
+  OUT One day,iusP1 for found ELN1 affected coins near ADL1 local-P1 has gave them to resembleP2
+  REF <P2> was sad. <P1> said, "Let us go to <L1> on <D1>." They were happy.
+  OUT PP2 he was sad. KouP1, said, "Let us go to stealsL1 414 on thoughtD1 "." They were happy.
+  lost: ['<D1>', '<L1>', '<N1>', '<P1>', '<P2>']
+
+vocab: gpt2 has only <|endoftext|> special; ids 50258..50303 are spare slots of the 50304 embedding table
+
+== xsum / (e) spare slots 50258..50262 as placeholders: n=40 exact=0% entity_kept=0% (entities=190)
+  token acc per level: 0.14 0.29 0.41 0.45 0.59 0.65 0.71 0.79 0.79
+  REF [50258] went to [50260] with [50259]. They had [50261] apples and ate them on [50262].
+  OUT fact went to   with  Meanwhile. They had  apples apples and ate them on  save.
+  REF One day, [50258] found [50261] coins near [50260]. [50258] gave them to [50259].
+  OUT One day,  grandmother found  Asia coins near  Transformation.   gave them to  senior.
+  REF [50259] was sad. [50258] said, "Let us go to [50260] on [50262]." They were happy.
+  OUT Squ was sad.   said, "Let us go to   on  metres." They were happy.
+  lost: ['50258', '50259', '50260', '50261', '50262']
+  placeholder sequence identical (order+count): 0%

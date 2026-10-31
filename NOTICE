@@ -1,0 +1,17 @@
+ncm-modular
+This package is an independent third-party work. It is not affiliated with or endorsed by HazyResearch / Stanford or the NCM authors.
+
+Upstream credit
+- Method, architecture, released checkpoints and reference implementation:
+  "Next-Concept Modeling: Fast, Parallel Coarse-to-Fine Text Generation", H. Kumbong et al., arXiv:2610.14162 (2026).
+  Code: https://github.com/HazyResearch/ncm (MIT, Copyright (c) 2025 Hermann Kumbong).
+  Checkpoints: https://huggingface.co/hazyresearch/ncm-checkpoints (MIT per upstream; not redistributed here).
+- MLX re-implementation used as a dependency (Block, rope tables, BPE, TinyStories codec, checkpoint conversion):
+  https://github.com/janmus1c/ncm-mlx (MIT). Installed from PyPI/git, not copied.
+- codec_mlx.py is our own MLX port of the XSum/WMT14 codec variant, written against the upstream PyTorch model
+  (models/vqvae.py) as numerical reference. convert.py / ref_torch.py / ref_dump.py import the upstream PyTorch modules from a
+  separate checkout (NCM_UPSTREAM); upstream source is NOT vendored. If you vendor it, keep the upstream MIT notice.
+- Datasets are used for derived metrics only and are not redistributed: MASSIVE (CC BY 4.0, Amazon Science, FitzGerald et al. 2022),
+  TinyStories (Eldan & Li 2023; CDLA-Sharing-1.0: short modified gold excerpts are included in results/seam/samples.md under that license, see the file header), XSum / WMT14 (only through the pretrained upstream codecs).
+Made as a human-AI collaboration: direction and decisions by the human author, code, experiments and docs largely by Claude (Anthropic) agents.
+See LICENSES.md for the full audit.
