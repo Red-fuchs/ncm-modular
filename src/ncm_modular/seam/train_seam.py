@@ -90,7 +90,7 @@ def main():
             g16.update(tree_map(cast, gen.parameters())); g16.eval()
             if a.n: r = dict(step=s + 1, loss=ema, train_exact=exact(g16, ptr, arr[ttr], codes[ttr], a.n))
             else:
-                dl, d01 = dev_losses(g16, codes[tdv].astype(np.int32), pdv); r = dict(step=s + 1, loss=ema, dev_loss=dl, dev_c1=d01, dev_exact128_gold_l0=exact(g16, pdv, ad[tdv], cd_[tdv]))
+                dl, d01 = dev_losses(g16, cd_[tdv].astype(np.int32), pdv); r = dict(step=s + 1, loss=ema, dev_loss=dl, dev_c1=d01, dev_exact128_gold_l0=exact(g16, pdv, ad[tdv], cd_[tdv]))
             g16.train(); curve.append(r); print("  ", r, flush=True); json.dump(curve, open(f"{a.out}/curve.json", "w"))
             if not a.n and r["dev_loss"] < best: best = r["dev_loss"]; gen.save_weights(f"{a.out}/best.safetensors"); json.dump(r, open(f"{a.out}/best.json", "w"))
         if last: break

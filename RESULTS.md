@@ -89,3 +89,7 @@ Reading:
 ## 6. Release edits
 
 For the public release, a few test-pool names in `texts.py` and `mask_stress.py` were replaced by fictional names. The CPU-only scripts (`roundtrip_news.py`, `mask_stress.py`, `parity.py`) were re-run afterwards with the final sources, so all stored outputs in `results/codec` and `results/masking` come from the code in this repo. Changes versus the first run: XSum raw round trip entities kept 90 % to 89 %; masking stress raw exact XSum 84.0 % to 80.7 %, TinyStories 2.0 % to 1.3 %, regex-detected-span exact TinyStories 38.0 % to 40.7 %; all other headline numbers unchanged. The TinyStories codec round trip (62 % entities kept) was not re-run and no output of it is stored.
+
+## Erratum (2026-10-31)
+
+`seam/train_seam.py` computed the periodic dev loss with train-split codes (`codes[tdv]`) instead of dev-split codes (`cd_[tdv]`). Fixed in this commit. Effect: best-checkpoint *selection* for the block-seam variants used a wrong signal. The reported seam metrics (entity consistency, spurious names, judge PPL) were measured on the held-out test stories and are unaffected as measurements, but the chosen checkpoints may not be the best ones. A longer re-run with true dev loss is in progress.
