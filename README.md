@@ -59,21 +59,21 @@ All numbers are single runs on one M1 Max (64 GB), small models, no confidence i
 
 *Measured before 2026-10-31 10:45, probably throttled (see below). The bottleneck looks like data volume (the generator must learn a codec latent space from 11.5k examples), not the codec (target round trip 99.97 %).
 
-**Block-seam experiment** (TinyStories, official TinyStories codec (frozen) + our 8L/512d generator, three prefix variants a/b/c, ~66 min training each, strongly undertrained): the entity table and the coarse-code memory help with names, but the seam smoothing is **not shown**.
+**Block-seam experiment** (TinyStories, official TinyStories codec (frozen) + our 8L/512d generator, three prefix variants a/b/c). v2 run: 258k block pairs, 4500 more steps per variant (true dev loss 1.002 / 1.005 / 1.001, still improving), 250 test stories, bootstrap 95 % CIs over stories. **The entity table helps significantly; the coarse-code memory adds no significant gain on top; seam smoothing is not shown.**
 
-| variant | prefix | invented names (T=0.7) | entity consistency (T=0.7) | seam cond. PPL (T=0) |
+| variant | prefix | invented names (T=0.7) | block-0 character carry-over (gold 0.82) | seam-0 PPL / random-next control (lower = better) |
 |---|---|---|---|---|
-| a | text tail only | 8.1 % | 91.6 % | 39.0 |
-| b | + entity table | 3.2 % | 96.6 % | 40.0 |
-| c | + table + coarse codes of 6 earlier blocks | 2.2 % | 97.7 % | 43.2 |
+| a | text tail only | 6.0 % [4.2, 8.0] | 0.49 | 0.74 [0.64, 0.86] |
+| b | + entity table | 2.3 % [1.4, 3.3] | 0.61 | 0.91 [0.78, 1.07] |
+| c | + table + coarse codes of 6 earlier blocks | 1.9 % [1.1, 2.8] | 0.63 | 0.78 [0.67, 0.91] |
 
-Character carry-over from block 0 into later blocks: 41.8 % (a) to 60.2 % (c); gold is 82.4 %. At T=0 all models degenerate into repetition (cross-block 4-gram repeat 32 to 37 %), seam perplexities at T=0 are therefore not comparable with T=0.7 and the gold (repetitive text is easy to predict, so T=0 PPL looks better than gold). Read `RESULTS.md` before quoting any of this.
+Greedy decoding agrees on invented names (9.5 / 0.7 / 1.9 %). All variants beat the random-next control on the seam metric, but text-only (a) ranks best, so the seam effect is confounded by overall text quality (within-block PPL 165 to 193 across variants). Generated text still shows word doubling ("said said"). (c) costs ~37 % more training time and ~2x inference latency for no significant gain over (b). First (short, 66 min) run and an erratum on its dev-loss selection are in `RESULTS.md`; v2 files in `results/seam/v2/`.
 
 **Speed on M1 Max.** Generation latency for one 128-token block, seam generator (8L/512d, 12 codec levels, fp16, NFE 12): 49 to 69 ms at batch 1, i.e. roughly 1900 to 2600 tok/s, measured on 2026-10-31 around 15:37 (after the Low Power Mode problem was fixed). Batching hardly helps (about 1.1 to 1.9 s per batch of 50 blocks; the GPU is already busy). Earlier pilot numbers (TinyStories 89M: 128 tokens in 60 to 110 ms; MASSIVE latencies above) were taken **before 2026-10-31 10:45 with macOS Low Power Mode active on AC power, which cost about 46 % throughput**; treat them as lower bounds on speed. Training throughput of the MASSIVE pilot was affected as well.
 
 ## Limitations
 
-- Tiny models, tiny data, single seeds, no confidence intervals. The "negative" results are about this setup (from scratch, 11.5k examples, short training), not about NCM in general.
+- Tiny models, tiny data, single seeds; confidence intervals only for the v2 seam run. The "negative" results are about this setup (from scratch, 11.5k examples, short training), not about NCM in general.
 - Surrogate masking needs an entity detector. The regex detector (86 to 91 % span recall) is the weak link; perfect gold spans were used for the stress tests.
 - Masked outputs are restored by table lookup, so correctness of facts depends on the table, not on the model.
 - The seam experiment does not prove smoothing; generated text at T=0 is degenerate; the LM judge (a 1.2B model) scores windows only.
