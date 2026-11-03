@@ -1,0 +1,29 @@
+name: Result reproduction / correction
+description: You reproduced, failed to reproduce, or found an error in a reported number
+labels: [results]
+body:
+  - type: input
+    id: claim
+    attributes:
+      label: Which result
+      description: Section/table in README.md or RESULTS.md.
+    validations:
+      required: true
+  - type: textarea
+    id: run
+    attributes:
+      label: Your run
+      description: Exact command, commit, steps/seed, and your numbers next to ours.
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      placeholder: "M1 Max 64 GB, macOS ..., mlx 0.32.3, Low Power Mode off"
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes / suspected cause

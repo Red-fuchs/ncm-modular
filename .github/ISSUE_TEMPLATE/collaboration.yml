@@ -1,0 +1,23 @@
+name: Collaboration / compute
+description: Offer compute, propose research, or contribute a module (see the README roadmap)
+labels: [collaboration]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Roadmap area
+      options:
+        - "Stage 0: compute-matched 150M pilot"
+        - "Shared multilingual (EN + DE) codec"
+        - "1B base NCM / modules"
+        - "Domain or language module"
+        - "Other"
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What you would like to do or offer, and what you need from this side.
+    validations:
+      required: true

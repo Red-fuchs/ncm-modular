@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Upstream NCM (method, official checkpoints)
+    url: https://github.com/HazyResearch/ncm/issues
+    about: Questions about NCM itself go to HazyResearch.
+  - name: ncm-mlx (TinyStories codec, MLX blocks)
+    url: https://github.com/janmus1c/ncm-mlx/issues
+    about: Bugs in the ncm-mlx dependency.
+  - name: Security vulnerability
+    url: https://github.com/Red-fuchs/ncm-modular/security/advisories/new
+    about: Report privately, not as a public issue.
