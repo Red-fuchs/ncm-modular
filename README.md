@@ -114,7 +114,7 @@ Env vars: `NCM_WORK` (default `./w`), `NCM_UPSTREAM` (HazyResearch/ncm checkout,
 
 ## Related work & credit
 
-This builds on other people's work, and we are grateful for it. NCM itself (method, architecture, checkpoints, reference code) is by Kumbong et al. at HazyResearch / Stanford ([HazyResearch/ncm](https://github.com/HazyResearch/ncm)). The MLX implementation of the TinyStories codec and its building blocks, which we depend on, is [janmus1c/ncm-mlx](https://github.com/janmus1c/ncm-mlx). If you are one of these authors and would like something changed or credited differently, please open an issue; we are happy to adjust.
+This builds on other people's work, and we are grateful for it. NCM itself (method, architecture, checkpoints, reference code) is by Kumbong et al. at HazyResearch / Stanford ([HazyResearch/ncm](https://github.com/HazyResearch/ncm)). The MLX implementation of the TinyStories codec and its building blocks, which we depend on, is [janmus1c/ncm-mlx](https://github.com/janmus1c/ncm-mlx). Since 0.3.0, ncm-mlx also converts the XSum and WMT14 codecs (torch-free, SHA-pinned). We checked it against our port and the PyTorch reference on our 16-input batch (CPU, fp32): all codes match ours, and the single WMT14 level-9 near-tie is shared by both MLX ports (our fp64 run picks the same code). Prefer ncm-mlx for these codecs; `codec_mlx.py` stays here as a cross-check. If you are one of these authors and would like something changed or credited differently, please open an issue; we are happy to adjust.
 
 ## How this was made
 
