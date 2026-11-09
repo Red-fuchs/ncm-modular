@@ -1,0 +1,8 @@
+torch>=2.5          # flex_attention needs >=2.5; tested locally with 2.11 (CPU only)
+numpy
+omegaconf
+hydra-core
+datasets
+transformers
+huggingface_hub[cli]
+pytest

@@ -15,3 +15,9 @@ Upstream credit
   TinyStories (Eldan & Li 2023; CDLA-Sharing-1.0: short modified gold excerpts are included in results/seam/samples.md under that license, see the file header), XSum / WMT14 (only through the pretrained upstream codecs).
 Made as a human-AI collaboration: direction and decisions by the human author, code, experiments and docs largely by Claude (Anthropic) agents.
 See LICENSES.md for the full audit.
+
+Vendored code (pt150/ncm150/vendor/)
+- models/{common,next_concept,vqvae,vae,quant}.py and utils/{misc,registry}.py are copied from https://github.com/HazyResearch/ncm
+  at commit c70274273f489abc73832b2b98584a8483b6b203 (MIT, Copyright (c) 2025 Hermann Kumbong; licence text in
+  pt150/ncm150/vendor/LICENSE.upstream). Only import paths were re-rooted (marked in each file header), plus one marked
+  LOCAL edit in utils/registry.py (tokenizer registry emptied). Everything else in pt150/ is our own code.

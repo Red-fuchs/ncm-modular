@@ -1,0 +1,62 @@
+# Shared defaults. Arm files and mode overlays are merged on top (later wins). CLI: key.sub=value.
+arm: ar                      # ar | ncm
+seed: 1234
+out_dir: runs/${arm}
+device: auto                 # auto | cuda | mps | cpu
+precision: bf16              # bf16 | fp32 (bf16 autocast on cuda; fp32 master weights always)
+data:
+  dir: data/fineweb_edu_gpt2 # train_*.bin / val.bin uint16 GPT-2 token shards (see prep_data.py)
+  hf_name: HuggingFaceFW/fineweb-edu
+  hf_config: sample-10BT
+  window: 1024               # text tokens per sample (= codec context length)
+  eos_id: 50256              # doc separator AND unconditional prefix token (BOS)
+  vocab: 50304               # GPT-2 vocab padded
+  val_windows: 256
+codec:                       # frozen NCM codec (upstream OWT config); targets for the ncm arm
+  checkpoint: artifacts/owt/tokenizer.pt   # hf download hazyresearch/ncm-checkpoints owt/tokenizer.pt
+  random_init: false         # tests only
+  n_levels: 32               # levels = squares 1,4,9,...,n^2 (n^2 == window)
+  vocab: 8192
+  embed_dim: 384
+  n_layers: 6
+  dropout: 0.3
+  pre_quant_groupnorm: 8
+model:
+  n_layer: 12
+  n_head: 16
+  n_embd: 1024
+  mlp_ratio: 4.0
+  bias: true
+  dropout: 0.0
+  use_qk_norm: true
+  rope_base: 100000
+  ffn: dense                 # extension point: dense | moe (ncm150/ext.py)
+  experts: null              # extension point: per-level experts spec
+ncm:
+  level_weighting: uniform   # uniform (every code equal) | per_level_mean
+  flex_attention: false      # true on CUDA for the real run (block-diagonal sparsity)
+  post_upsample_conv: true
+train:
+  global_bs: 64              # windows per optimizer step (same in both arms => identical data order)
+  micro_bs: 4                # windows per forward
+  lr: 6.0e-4
+  min_lr_ratio: 0.1
+  warmup_frac: 0.02
+  schedule: cosine           # cosine | wsd
+  wsd_decay_frac: 0.2
+  weight_decay: 0.1
+  betas: [0.9, 0.95]
+  grad_clip: 1.0
+  grad_ckpt: false
+  compile: false
+  log_every: 10
+  eval_every: 250
+  eval_windows: 64
+  ckpt_every: 250
+  keep_ckpts: 2
+  max_minutes: 0             # hard wall-clock stop (0 = off); saves checkpoint
+budget:                      # compute matching
+  mode: flops                # flops | tokens
+  flops: 1.0e18              # total train FLOPs (algorithmic, incl. codec encode for ncm)
+  tokens: 0                  # text tokens, used when mode=tokens
+wandb: {enabled: false, project: ncm150}

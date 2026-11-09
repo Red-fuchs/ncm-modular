@@ -1,0 +1,4 @@
+# alternative sizing: same 12 transformer blocks as AR; adapters (heads/convs) on top (~177M by upstream count; heads+convs add ~25M)
+arm: ncm
+model: {n_layer: 12}
+ncm: {flex_attention: true}

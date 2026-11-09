@@ -1,0 +1,2 @@
+arm: ar
+model: {n_layer: 12}          # ~151M non-embedding (wte tied to head excluded)

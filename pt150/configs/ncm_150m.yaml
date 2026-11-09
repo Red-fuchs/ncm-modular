@@ -1,0 +1,3 @@
+arm: ncm
+model: {n_layer: 10}          # ~152M non-embedding by upstream count_params (excl. wte/wle/wpe; incl. 31 heads + 31 convs ~26M)
+ncm: {flex_attention: true}

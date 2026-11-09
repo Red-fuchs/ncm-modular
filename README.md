@@ -131,3 +131,7 @@ Ways to help, following the [roadmap](#roadmap): run or review stage 0 (AR vs NC
 ## Citation
 
 Please cite the NCM paper (arXiv:2610.14162) and, if you use the MLX stack, janmus1c/ncm-mlx. This repo has no paper. It is at https://github.com/Red-fuchs/ncm-modular.
+
+
+## PyTorch 150M comparison harness (branch torch-150m)
+See `pt150/README.md` (AR vs NCM, compute-matched, single CUDA GPU; code under `pt150/`, MLX code in `src/` unchanged).

@@ -1,0 +1,9 @@
+# local sanity / pytest on CPU (or MPS). random-init codec, tiny model.
+device: cpu
+precision: fp32
+data: {window: 16, vocab: 128, eos_id: 1, val_windows: 8}
+codec: {random_init: true, n_levels: 4, vocab: 32, embed_dim: 16, n_layers: 1, dropout: 0.0, pre_quant_groupnorm: 4}
+model: {n_layer: 2, n_head: 2, n_embd: 32, dropout: 0.1, rope_base: 10000}
+ncm: {flex_attention: false}
+train: {global_bs: 4, micro_bs: 2, lr: 3.0e-3, log_every: 1, eval_every: 5, eval_windows: 4, ckpt_every: 5, grad_ckpt: false}
+budget: {mode: tokens, tokens: 640}
