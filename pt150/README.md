@@ -19,7 +19,7 @@ for targets). Extension points for MoE / per-level experts: `ncm150/ext.py` (`mo
   `budget.mode=flops` sets steps per arm = floor(budget / flops_per_step); `mode=tokens` gives both arms the same steps. Logged each step: `flops`, `text_tokens`.
 
 ## Setup
-Linux, NVIDIA driver + CUDA 12.x, Python >= 3.10, torch >= 2.5 (flex attention), single GPU. H100: bf16 autocast, ~80 GB. 4080 Super 16 GB: use smoke overlay.
+Linux, NVIDIA driver + CUDA 12.x/13.x, Python >= 3.10, torch >= 2.5 (flex attention), single GPU. H100: bf16 autocast, ~80 GB. 4080 Super 16 GB: use smoke overlay.
 ```
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt            # then the CUDA build of torch for your driver
@@ -29,8 +29,8 @@ python -m pytest -q                        # CPU, ~25 s, includes full-size para
 ```
 ## Run
 ```
-./run.sh ar --smoke        # ~1 h cap (train.max_minutes=70), flops budget 2e16, global_bs 16
-./run.sh ncm --smoke
+./run.sh ncm --smoke       # run this first if you only have time for one (flex-attention path)
+./run.sh ar --smoke        # each smoke: ~1 h cap (train.max_minutes=70), flops budget 2e16, global_bs 16
 ./run.sh ar                # main: edit budget.flops (default 1e18) or pass budget.flops=3e18 ...
 ./run.sh ncm budget.flops=3e18
 ./run.sh ncm --cpu-tiny data.dir=... # local plumbing check, random-init codec
