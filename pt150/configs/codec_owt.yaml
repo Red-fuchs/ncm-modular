@@ -1,0 +1,7 @@
+# Upstream OWT codec (GPT-2 BPE, 1024 ctx, 32 square levels). NOT published yet (hazyresearch/ncm-checkpoints owt/ = TODO.md).
+# Use once available: ./fetch_codec.sh owt; PYTHONPATH=. python -m ncm150.train --config ncm_150m.yaml codec_owt.yaml --set model.n_layer=10 out_dir=runs/ncm_owt
+data: {window: 1024}
+codec: {name: owt, checkpoint: artifacts/owt/tokenizer.pt, sha256: null, levels: null, n_levels: 32, vocab: 8192, dropout: 0.3,
+        pre_quant_dropout: 0.0, vq: {learned_l1_cascade_norm: false, learned_l1_cascade_norm_final: false}}
+train: {global_bs: 64, micro_bs: 4}
+# smoke_4080s.yaml assumes 48-token windows (global_bs 336); with owt pass train.global_bs=16 train.micro_bs=1.

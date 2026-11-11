@@ -37,7 +37,7 @@ def train_flops_per_window(cfg, codec=None, dense_attn=False):
         return 3 * ar_fwd_flops(cfg.model, cfg.data.vocab, T, dense_attn)
     f = 3 * ncm_fwd_flops(cfg.model, levels_of(cfg), cfg.codec.embed_dim, cfg.codec.vocab, 1, cfg.ncm.post_upsample_conv, dense_attn)
     if codec is not None:
-        x = torch.zeros(1, T, dtype=torch.long)
+        x = torch.zeros(1, T, dtype=torch.long, device=next(codec.parameters()).device)
         f += measure_fwd(lambda: codec.encode(x))
     return f
 

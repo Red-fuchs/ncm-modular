@@ -10,4 +10,5 @@ def load_cfg(*files, overrides=()):
     return OmegaConf.merge(*parts)
 
 def levels_of(cfg):
-    return [i * i for i in range(1, int(cfg.codec.n_levels) + 1)]
+    c = cfg.codec
+    return [int(l) for l in c.levels] if c.get("levels") else [i * i for i in range(1, int(c.n_levels) + 1)]

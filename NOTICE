@@ -20,4 +20,5 @@ Vendored code (pt150/ncm150/vendor/)
 - models/{common,next_concept,vqvae,vae,quant}.py and utils/{misc,registry}.py are copied from https://github.com/HazyResearch/ncm
   at commit c70274273f489abc73832b2b98584a8483b6b203 (MIT, Copyright (c) 2025 Hermann Kumbong; licence text in
   pt150/ncm150/vendor/LICENSE.upstream). Only import paths were re-rooted (marked in each file header), plus one marked
-  LOCAL edit in utils/registry.py (tokenizer registry emptied). Everything else in pt150/ is our own code.
+  LOCAL edit in utils/registry.py (tokenizer registry emptied) and one in models/quant.py (area resampling as an exact matmul on
+  MPS for non-divisible level sizes; CPU/CUDA unchanged). Everything else in pt150/ is our own code.

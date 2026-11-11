@@ -8,19 +8,25 @@ data:
   dir: data/fineweb_edu_gpt2 # train_*.bin / val.bin uint16 GPT-2 token shards (see prep_data.py)
   hf_name: HuggingFaceFW/fineweb-edu
   hf_config: sample-10BT
-  window: 1024               # text tokens per sample (= codec context length)
+  window: 48                 # text tokens per sample (= codec context length; xsum codec: 48)
   eos_id: 50256              # doc separator AND unconditional prefix token (BOS)
   vocab: 50304               # GPT-2 vocab padded
   val_windows: 256
-codec:                       # frozen NCM codec (upstream OWT config); targets for the ncm arm
-  checkpoint: artifacts/owt/tokenizer.pt   # hf download hazyresearch/ncm-checkpoints owt/tokenizer.pt
+codec:                       # frozen NCM codec, targets for the ncm arm. Default = upstream XSum codec (GPT-2 BPE, 48 tokens):
+  # the OWT codec (1024 ctx) is not published upstream yet (owt/ only has TODO.md); overlay codec_owt.yaml once it is.
+  name: xsum
+  checkpoint: artifacts/xsum/tokenizer.pt  # ./fetch_codec.sh (hf download hazyresearch/ncm-checkpoints xsum/tokenizer.pt)
+  sha256: 1f806ddaf8e023d1933e95efeabcaaf99f795576c0a05045f1a0f9389ab34fa7
   random_init: false         # tests only
-  n_levels: 32               # levels = squares 1,4,9,...,n^2 (n^2 == window)
-  vocab: 8192
+  levels: [4, 6, 10, 14, 20, 26, 32, 40, 48]  # tokens per level, last == data.window; null -> squares 1,4,...,n_levels^2
+  n_levels: null
+  vocab: 4096
   embed_dim: 384
   n_layers: 6
-  dropout: 0.3
+  dropout: 0.1
   pre_quant_groupnorm: 8
+  pre_quant_dropout: 0.25
+  vq: {learned_l1_cascade_norm: true, learned_l1_cascade_norm_final: true}  # merged over the upstream VQ defaults
 model:
   n_layer: 12
   n_head: 16
@@ -37,8 +43,8 @@ ncm:
   flex_attention: false      # true on CUDA for the real run (block-diagonal sparsity)
   post_upsample_conv: true
 train:
-  global_bs: 64              # windows per optimizer step (same in both arms => identical data order)
-  micro_bs: 4                # windows per forward
+  global_bs: 1344            # windows per optimizer step (same in both arms => identical data order); 1344 x 48 = 64.5k tok
+  micro_bs: 64               # windows per forward
   lr: 6.0e-4
   min_lr_ratio: 0.1
   warmup_frac: 0.02
@@ -51,7 +57,7 @@ train:
   compile: false
   log_every: 10
   eval_every: 250
-  eval_windows: 64
+  eval_windows: 1344
   ckpt_every: 250
   keep_ckpts: 2
   max_minutes: 0             # hard wall-clock stop (0 = off); saves checkpoint

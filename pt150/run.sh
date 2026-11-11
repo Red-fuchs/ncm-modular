@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # usage: ./run.sh <ar|ncm|ncm_blocks12> [--smoke|--cpu-tiny] [key=value ...]
-# resumes automatically from <out_dir>/last.pt. Data: python prep_data.py ...; codec: ./fetch_codec.sh (ncm only).
+# resumes automatically from <out_dir>/last.pt. Data: python prep_data.py ...; codec: ./fetch_codec.sh (ncm only, XSum codec).
 set -euo pipefail
 cd "$(dirname "$0")"; export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 arm="${1:?arm: ar | ncm | ncm_blocks12}"; shift

@@ -1,4 +1,4 @@
-# ~1 h on RTX 4080 Super 16 GB. Same 150M architectures, tiny budget. Tune micro_bs to fit VRAM (ncm: 1-2 with grad_ckpt).
-train: {global_bs: 16, micro_bs: 1, grad_ckpt: true, eval_every: 50, ckpt_every: 50, eval_windows: 16, max_minutes: 70}
+# ~1 h on RTX 4080 Super 16 GB. Same 150M architectures, tiny budget. 336 windows x 48 tok = 16k text tok/step.
+# micro_bs: ncm sequence = 1 + 196 codes per window; raise micro_bs if VRAM allows (must divide 336).
+train: {global_bs: 336, micro_bs: 16, grad_ckpt: true, eval_every: 50, ckpt_every: 50, eval_windows: 336, max_minutes: 70}
 budget: {mode: flops, flops: 2.0e16}
-data: {val_windows: 64}

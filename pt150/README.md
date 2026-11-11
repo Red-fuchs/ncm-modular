@@ -1,21 +1,21 @@
 # pt150: compute-matched 150M comparison, AR vs NCM (PyTorch, single CUDA GPU)
 
 Branch `torch-150m`. Upstream HazyResearch/ncm ships no training code, so this is our own loop around their model files
-(vendored, see NOTICE). Arms: `ar` (causal LM from the same `Block`), `ncm` (upstream `NextConceptTransformer`, frozen OWT codec
-for targets). Extension points for MoE / per-level experts: `ncm150/ext.py` (`model.ffn`, `model.experts` in config).
+(vendored, see NOTICE). Arms: `ar` (causal LM from the same `Block`), `ncm` (upstream `NextConceptTransformer`, frozen upstream XSum codec
+for targets; the OWT codec is not published upstream yet, see Codec). Extension points for MoE / per-level experts: `ncm150/ext.py` (`model.ffn`, `model.experts` in config).
 
 ## What is compared
-- Data: FineWeb-Edu (sample-10BT), GPT-2 BPE, 1024-token windows, uint16 shards. Sample `j` of the stream is a pure function of
+- Data: FineWeb-Edu (sample-10BT), GPT-2 BPE, 48-token windows (= XSum codec context), uint16 shards. Sample `j` of the stream is a pure function of
   `(seed, j)`; both arms read the same windows in the same order (`train.global_bs` windows per step, identical by default).
-- AR: input `[BOS] + w[:-1]`, loss on all 1024 tokens (nats/token). BOS = EOS id 50256.
-- NCM: prefix = BOS; codec(window) -> 32 levels (1,4,...,1024 codes, 8192-way); inputs = cumulative reconstruction pooled to the next
-  level; loss = CE over 11439 target codes (`ncm.level_weighting`: `uniform` default | `per_level_mean`). Logged `code_nats_per_text_token`
-  = summed code CE / 1024, NOT the same quantity as AR nats/token. Cross-arm quality needs generation eval (upstream `evaluate.py`, gen-ppl; not wired here).
-- Size: non-embedding params by upstream `count_params` (excludes wte/wle/wpe): AR 12L d1024 = 151.2M; NCM 10L d1024 = 152.1M
-  (heads + post-upsample convs are ~26M of that). `ncm_150m_blocks12.yaml`: same 12 blocks as AR, 177M.
+- AR: input `[BOS] + w[:-1]`, loss on all 48 tokens (nats/token), same 48-token context as NCM. BOS = EOS id 50256.
+- NCM: prefix = BOS; codec(window) -> 9 levels (4,6,10,14,20,26,32,40,48 codes, 4096-way); inputs = cumulative reconstruction pooled
+  to the next level; loss = CE over 196 target codes (levels 2-9) (`ncm.level_weighting`: `uniform` default | `per_level_mean`). Logged `code_nats_per_text_token`
+  = summed code CE / 48, NOT the same quantity as AR nats/token. Cross-arm quality needs generation eval (upstream `evaluate.py`, gen-ppl; not wired here).
+- Size: non-embedding params by upstream `count_params` (excludes wte/wle/wpe): AR 12L d1024 = 151.2M; NCM 11L d1024 = 145.3M
+  (8 heads + 8 post-upsample convs included). `ncm_150m_blocks12.yaml`: same 12 blocks as AR, 157.9M.
 - Compute matching: `ncm150/flops.py`. 6ND-style: train = 3 x fwd, 2 FLOPs per MAC, matmul work + attention over *allowed* pairs;
-  ncm also pays the online codec encode. Per 1024-token window (computed, not measured): AR 1.32 TFLOP, NCM 9.93 TFLOP (7.5x;
-  with plain masked SDPA the NCM attention is dense and costs 25.1 TFLOP, 2.5x more, hence flex attention for the real run).
+  ncm also pays the online codec encode. Per 48-token window (computed, not measured): AR 58.5 GFLOP, NCM 168.8 GFLOP incl. codec encode (2.9x;
+  plain masked SDPA counts dense attention: 173.2 GFLOP, only 2.6 % more at this length, so `ncm.flex_attention=false` is a safe fallback).
   `budget.mode=flops` sets steps per arm = floor(budget / flops_per_step); `mode=tokens` gives both arms the same steps. Logged each step: `flops`, `text_tokens`.
 
 ## Setup
@@ -23,14 +23,19 @@ Linux, NVIDIA driver + CUDA 12.x/13.x, Python >= 3.10, torch >= 2.5 (flex attent
 ```
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt            # then the CUDA build of torch for your driver
-./fetch_codec.sh                           # ncm only: OWT codec -> artifacts/owt/tokenizer.pt (MIT, not redistributed)
+./fetch_codec.sh                           # ncm only: XSum codec -> artifacts/xsum/tokenizer.pt (~300 MB, sha256-checked, MIT, not redistributed)
 python prep_data.py --out data/fineweb_edu_gpt2 --max-tokens 2e8     # smoke: 2e8 is plenty; main run: size to budget
 python -m pytest -q                        # CPU, ~25 s, includes full-size param count (needs ~6 GB RAM); -m "not slow" skips that
 ```
+## Codec
+Default is the upstream **XSum** codec (`hazyresearch/ncm-checkpoints` `xsum/tokenizer.pt`, sha256 pinned in `configs/base.yaml`),
+the only published codec with GPT-2 BPE. The OWT codec (1024 ctx) the harness was first written for is not published yet
+(`owt/` holds only `TODO.md`). Codec shape is config-driven (`codec.levels`, `codec.vq`), loaded with `strict=True`.
+
 ## Run
 ```
 ./run.sh ncm --smoke       # run this first if you only have time for one (flex-attention path)
-./run.sh ar --smoke        # each smoke: ~1 h cap (train.max_minutes=70), flops budget 2e16, global_bs 16
+./run.sh ar --smoke        # each smoke: ~1 h cap (train.max_minutes=70), flops budget 2e16, global_bs 336 windows (16k tok)
 ./run.sh ar                # main: edit budget.flops (default 1e18) or pass budget.flops=3e18 ...
 ./run.sh ncm budget.flops=3e18
 ./run.sh ncm --cpu-tiny data.dir=... # local plumbing check, random-init codec
@@ -53,6 +58,10 @@ Send back: `tar czf logs_<arm>_<host>.tgz runs/*/log.jsonl && nvidia-smi -q > gp
 | RTX 4080S 16GB | ncm (flex, grad_ckpt) | TBD | TBD | TBD | TBD |
 
 ## Known gaps
-- Nothing here ran on CUDA. Flex attention path (`ncm.flex_attention=true`) and `train.compile` are untested; fallback is plain SDPA with a bool mask (2.5x NCM FLOPs, 16 GB cards will need `micro_bs=1` + `grad_ckpt`).
-- Codec not retrained on FineWeb-Edu: uses the upstream OWT codec (GPT-2 tokenizer, 1024 ctx).
+- Nothing here ran on CUDA. Flex attention path (`ncm.flex_attention=true`) and `train.compile` are untested; fallback is plain SDPA with a bool mask (+2.6 % NCM FLOPs at 48 tokens; the smoke overlay uses `micro_bs=16` + `grad_ckpt`, tune for VRAM).
+- Codec not retrained on FineWeb-Edu: uses the upstream XSum codec (GPT-2 tokenizer, 48 ctx, built for XSum news summaries of <= 48 tokens). Exact round trip
+  on FineWeb-Edu text is not measured here; a 2-sentence news check decodes 100 %.
+- 48-token context for both arms, so this compares short-context modeling only. When upstream publishes `owt/tokenizer.pt`:
+  `./fetch_codec.sh owt`, then see the header of `configs/codec_owt.yaml` (1024 ctx, 32 levels, ncm `model.n_layer=10`).
+- MPS (Apple Silicon): codec encode + FLOP setup tested on MPS (pytest); train loop and throughput not measured there.
 - No generation-quality eval; no MoE / per-level experts yet (hooks only); no multi-GPU.

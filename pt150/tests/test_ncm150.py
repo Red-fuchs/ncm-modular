@@ -51,12 +51,14 @@ def test_flops_formula_matches_counter(arm, tiny_data, tmp_path):
     if arm == "ar":
         net = build_model(c).eval(); x = torch.randint(0, 128, (1, 16)); T = 16
         meas = fl.measure_fwd(lambda: net(x))
-        assert meas == fl.ar_fwd_flops(m, 128, T, dense_attn=True) - 4 * nl * d * T * T  # CPU counter skips SDPA
+        full = fl.ar_fwd_flops(m, 128, T, dense_attn=True)
+        assert meas in (full, full - 4 * nl * d * T * T)  # older torch: CPU FlopCounterMode skips SDPA; >= 2.15 counts it
         assert fl.ar_pairs(T) == T * (T + 1) // 2
     else:
         cod = build_codec(c); net = build_model(c, cod).eval(); L = levels_of(c); S = 1 + sum(L[1:])
         x = torch.randn(1, S, c.codec.embed_dim); meas = fl.measure_fwd(lambda: net(x))
-        assert meas == fl.ncm_fwd_flops(m, L, c.codec.embed_dim, c.codec.vocab, 1, True, dense_attn=True) - 4 * nl * d * S * S
+        full = fl.ncm_fwd_flops(m, L, c.codec.embed_dim, c.codec.vocab, 1, True, dense_attn=True)
+        assert meas in (full, full - 4 * nl * d * S * S)
         assert fl.ncm_pairs(1, L) == _pairs_from_mask(net)
         assert fl.ncm_pairs(1, L) < S * S
 
@@ -99,6 +101,41 @@ def test_lr_schedules():
     tc = OmegaConf.create(dict(lr=1.0, min_lr_ratio=0.1, warmup_frac=0.1, schedule="cosine", wsd_decay_frac=0.2))
     assert lr_at(0, 100, tc) < 1 and abs(lr_at(10, 100, tc) - 1) < 1e-6 and abs(lr_at(99, 100, tc) - 0.1) < 0.01
     tc.schedule = "wsd"; assert lr_at(50, 100, tc) == 1.0 and lr_at(99, 100, tc) < 0.2
+
+def test_levels_config():
+    assert levels_of(load_cfg()) == [4, 6, 10, 14, 20, 26, 32, 40, 48] and load_cfg().data.window == 48
+    o = load_cfg("codec_owt.yaml"); L = levels_of(o)
+    assert len(L) == 32 and L[-1] == o.data.window == 1024
+
+def test_missing_codec_message(tmp_path):
+    c = load_cfg("ncm_150m.yaml", overrides=["device=cpu", f"codec.checkpoint={tmp_path}/nope.pt"])
+    with pytest.raises(FileNotFoundError, match="fetch_codec.sh xsum"): build_codec(c)
+
+_XSUM = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "artifacts/xsum/tokenizer.pt")
+
+@pytest.mark.skipif(not os.path.exists(_XSUM), reason="run ./fetch_codec.sh first")
+def test_xsum_codec_loads_strict_and_roundtrips():
+    c = load_cfg("ncm_150m.yaml", overrides=["device=cpu"]); cod = build_codec(c)  # strict=True inside
+    x = torch.randint(0, 50257, (2, 48)); x[:, 30:] = 50256
+    r = cod.decode(cod.encode(x)).argmax(-1)
+    assert cod.encode(x).shape == (2, sum(levels_of(c))) and (r == x).float().mean() > 0.5  # random ids: lossy but not broken
+
+@pytest.mark.parametrize("L,n", [(1024, 961), (48, 40), (48, 6), (16, 9), (12, 4)])
+def test_area_matrix_equals_interpolate(L, n):
+    from ncm150.vendor.models.quant import _area_matrix
+    x = torch.randn(2, 5, L, dtype=torch.float64)
+    ref = torch.nn.functional.interpolate(x, size=(n,), mode="area")
+    assert torch.allclose(x @ _area_matrix(L, n, x.device, x.dtype).t(), ref, atol=1e-12)
+
+_ACC = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else None
+
+@pytest.mark.skipif(_ACC is None, reason="needs CUDA or MPS")
+def test_codec_flops_and_encode_on_accelerator(tiny_data, tmp_path):
+    c = tiny_cfg("ncm", tiny_data, tmp_path, "codec.levels=[4,7,10,16]", f"device={_ACC}")  # non-divisible levels
+    cod = build_codec(c).to(_ACC)
+    assert fl.train_flops_per_window(c, cod) > 0  # dummy encode input must live on the codec's device
+    x = torch.randint(0, 128, (2, 16))
+    assert torch.equal(cod.encode(x.to(_ACC)).cpu(), cod.cpu().encode(x))
 
 def test_ffn_extension_point_guard(tiny_data, tmp_path):
     with pytest.raises(NotImplementedError): build_model(tiny_cfg("ar", tiny_data, tmp_path, "model.ffn=moe"))

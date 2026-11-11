@@ -11,6 +11,27 @@ from ncm150.vendor.utils.registry import level_schedulers
 
 
 # Phi (quant_resi): per-level residual conv after upsample, blending (1-r)*h + r*Conv1d(h).
+
+# LOCAL: MPS adaptive pooling rejects non-divisible sizes (e.g. 1024->961, 48->40). Area resampling is a fixed
+# linear map (adaptive_avg_pool1d windows [floor(i*L/n), ceil((i+1)*L/n))), so apply it as a cached matmul there.
+_AREA_CACHE = {}
+
+def _area_matrix(L, n, device, dtype):
+    k = (L, n, str(device), dtype)
+    if k not in _AREA_CACHE:
+        M = torch.zeros(n, L, dtype=torch.float64)
+        for i in range(n):
+            a, b = (i * L) // n, -((-(i + 1) * L) // n)
+            M[i, a:b] = 1.0 / (b - a)
+        _AREA_CACHE[k] = M.to(device=device, dtype=dtype)
+    return _AREA_CACHE[k]
+
+def _area(x_BCL, n):
+    L = x_BCL.shape[-1]
+    if x_BCL.device.type != "mps" or L % n == 0:
+        return F.interpolate(x_BCL, size=(n,), mode="area")
+    return x_BCL @ _area_matrix(L, n, x_BCL.device, x_BCL.dtype).t()
+
 class Phi(nn.Conv1d):
     def __init__(self, embed_dim, quant_resi, learnable_ratio=False):
         ks = 3
@@ -399,7 +420,7 @@ class MultiscaleResidualVectorQuantizer(VectorQuantizerBaseClass):
         z_BCL = z_BLC.transpose(-1, -2)
         if level_idx == 0 and self.learned_l1_sampling:
             return self.learned_down_l1(z_BCL).transpose(-1, -2).contiguous()
-        zd_BCL = F.interpolate(z_BCL, size=(target_len,), mode="area")
+        zd_BCL = _area(z_BCL, target_len)
         if self.learned_all_sampling and 1 <= level_idx <= len(self.levels) - 2:
             zd_BCL = zd_BCL + self.learned_down_refine[level_idx](zd_BCL)
         return zd_BCL.transpose(-1, -2).contiguous()
@@ -613,9 +634,7 @@ class MultiscaleResidualVectorQuantizer(VectorQuantizerBaseClass):
             z_rest -= quantized
             z_hats.append(z_hat)
             z_levels.append(
-                F.interpolate(
-                    z_hat.transpose(-1, -2), size=(level,), mode="area"
-                ).transpose(-1, -2)
+                _area(z_hat.transpose(-1, -2), level).transpose(-1, -2)
                 if i != num_levels - 1
                 else z_hat
             )
@@ -655,11 +674,7 @@ class MultiscaleResidualVectorQuantizer(VectorQuantizerBaseClass):
             z_hats.append(z_hat)
             if return_zlevels:
                 z_levels.append(
-                    F.interpolate(
-                        z_hat.transpose(-1, -2),
-                        size=(self.levels[level_idx],),
-                        mode="area",
-                    ).transpose(-1, -2)
+                    _area(z_hat.transpose(-1, -2), self.levels[level_idx]).transpose(-1, -2)
                     if level_idx != len(self.levels) - 1
                     else z_hat
                 )
@@ -686,11 +701,7 @@ class MultiscaleResidualVectorQuantizer(VectorQuantizerBaseClass):
             z_q_level = self._apply_quant_resi(z_q_level, level_idx)
             z_hat.add_(z_q_level)
             next_concepts.append(
-                F.interpolate(
-                    z_hat.transpose(-1, -2),
-                    size=(self.levels[level_idx + 1],),
-                    mode="area",
-                ).transpose(-1, -2)
+                _area(z_hat.transpose(-1, -2), self.levels[level_idx + 1]).transpose(-1, -2)
             )
             level_accum += self.levels[level_idx]
 
@@ -703,9 +714,7 @@ class MultiscaleResidualVectorQuantizer(VectorQuantizerBaseClass):
             upsampled = self._up_to_full(z_q_level, level_idx, self.levels[-1])
             upsampled = self._apply_quant_resi(upsampled, level_idx)
             z_hat.add_(upsampled)
-            return z_hat, (F.interpolate(
-                z_hat.transpose(-1, -2), size=(self.levels[level_idx + 1],), mode="area"
-            ).transpose(-1, -2))
+            return z_hat, (_area(z_hat.transpose(-1, -2), self.levels[level_idx + 1]).transpose(-1, -2))
         else:
             z_q_level = self._apply_quant_resi(z_q_level, level_idx)
             z_hat.add_(z_q_level)

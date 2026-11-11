@@ -1,4 +1,4 @@
-import math
+import math, os
 import torch, torch.nn as nn, torch.nn.functional as F
 from omegaconf import OmegaConf
 from torch.utils.checkpoint import checkpoint
@@ -53,12 +53,14 @@ def build_codec(cfg):
               aux=dict(fine_drop=dict(prob=0.5, min_keep=1)),
               levels=dict(use_manual_levels=True, manual_levels=L),
               learned_l1_cascade_norm=False, learned_l1_cascade_norm_final=False, ema_scale_by_world_size=False)
-    vq_cfg = OmegaConf.create(vq)
+    vq_cfg = OmegaConf.merge(OmegaConf.create(vq), c.get("vq") or {})
     m = VQVAE(in_vocab_size=cfg.data.vocab, context_length=cfg.data.window, embed_dim=c.embed_dim,
               vqvae_vocab_size=[c.vocab] * len(L), n_layers=c.n_layers, vector_quantizer_config=vq_cfg,
               compression_factor=1, dropout=c.dropout, pre_quant_groupnorm=c.pre_quant_groupnorm,
-              pre_quant_dropout=0.0, use_qk_norm=True)
+              pre_quant_dropout=float(c.get("pre_quant_dropout") or 0.0), use_qk_norm=True)
     if not c.random_init:
+        if not os.path.exists(c.checkpoint):
+            raise FileNotFoundError(f"codec {c.get('name')}: {c.checkpoint} missing, run ./fetch_codec.sh {c.get('name') or ''}".strip())
         sd = torch.load(c.checkpoint, map_location="cpu", weights_only=False)["model"]
         m.load_state_dict(sd, strict=True)
     m.eval().requires_grad_(False)
