@@ -30,12 +30,12 @@ def measure_fwd(fn):
     return fc.get_total_flops()
 
 def train_flops_per_window(cfg, codec=None, dense_attn=False):
-    """FLOPs to train on one window (= cfg.data.window text tokens), incl. codec encode for ncm."""
-    from ncm150.config import levels_of
-    T = int(cfg.data.window)
+    """FLOPs to train on one sample (data.prefix raw tokens + one data.window codec block), incl. codec encode (block only) for ncm."""
+    from ncm150.config import levels_of, sample_len
+    T, P = int(cfg.data.window), 1 + int(cfg.data.get("prefix") or 0)
     if cfg.arm == "ar":
-        return 3 * ar_fwd_flops(cfg.model, cfg.data.vocab, T, dense_attn)
-    f = 3 * ncm_fwd_flops(cfg.model, levels_of(cfg), cfg.codec.embed_dim, cfg.codec.vocab, 1, cfg.ncm.post_upsample_conv, dense_attn)
+        return 3 * ar_fwd_flops(cfg.model, cfg.data.vocab, sample_len(cfg), dense_attn)
+    f = 3 * ncm_fwd_flops(cfg.model, levels_of(cfg), cfg.codec.embed_dim, cfg.codec.vocab, P, cfg.ncm.post_upsample_conv, dense_attn)
     if codec is not None:
         x = torch.zeros(1, T, dtype=torch.long, device=next(codec.parameters()).device)
         f += measure_fwd(lambda: codec.encode(x))
@@ -43,7 +43,8 @@ def train_flops_per_window(cfg, codec=None, dense_attn=False):
 
 def plan_steps(cfg, flops_per_window):
     """-> (steps, flops_per_step, tokens_per_step). mode=flops: steps = floor(budget / flops_per_step)."""
-    bs, T = int(cfg.train.global_bs), int(cfg.data.window)
+    from ncm150.config import sample_len
+    bs, T = int(cfg.train.global_bs), sample_len(cfg)
     fps = flops_per_window * bs
     steps = int(cfg.budget.flops // fps) if cfg.budget.mode == "flops" else int(cfg.budget.tokens // (bs * T))
     return max(steps, 1), fps, bs * T

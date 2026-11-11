@@ -1,0 +1,3 @@
+# smoke for ctx1024 on 16 GB: 16 x 1024 tok/step, ~1 h cap. ncm sequence = 977 prefix + 196 codes.
+train: {global_bs: 16, micro_bs: 2, grad_ckpt: true, eval_every: 50, ckpt_every: 50, eval_windows: 64, max_minutes: 70}
+budget: {mode: flops, flops: 2.0e16}

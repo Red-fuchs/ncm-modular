@@ -2,7 +2,7 @@ import math, os
 import torch, torch.nn as nn, torch.nn.functional as F
 from omegaconf import OmegaConf
 from torch.utils.checkpoint import checkpoint
-from ncm150.config import levels_of
+from ncm150.config import levels_of, sample_len
 from ncm150.ext import apply_ffn_variant
 from ncm150.vendor.models.common import Block, LayerNorm, Transformer, precompute_rope_cos_sin
 from ncm150.vendor.models.next_concept import NextConceptTransformer
@@ -67,10 +67,10 @@ def build_codec(cfg):
     return m
 
 def build_ncm(cfg, codec):
-    m, L = cfg.model, levels_of(cfg)
+    m, L = cfg.model, levels_of(cfg); P = 1 + int(cfg.data.get("prefix") or 0)  # BOS + raw prefix tokens
     bc = _block_cfg(m)
     mc = OmegaConf.merge(bc, OmegaConf.create(dict(
-        context_length=cfg.data.window + 1, prefix_len=1, raw_token_prefix=True, prefix_pad_token_id=cfg.data.vocab - 1,
+        context_length=cfg.data.window + P, prefix_len=P, raw_token_prefix=True, prefix_pad_token_id=cfg.data.vocab - 1,
         vocab_size=[cfg.codec.vocab] * (len(L) - 1), predict_level0=False, attn_pattern="block_diagonal",
         use_positional_encoding=True, use_level_encoding=True, use_rope=True, rope_base=int(m.rope_base),
         ctx_encoder=dict(enabled=False), use_flex_attention=bool(cfg.ncm.flex_attention), query_level0=False,
@@ -87,7 +87,7 @@ def ncm_nonembedding_params(net):
 
 def build_model(cfg, codec=None):
     if cfg.arm == "ar":
-        return ARTransformer(cfg.model, cfg.data.vocab, cfg.data.window)
+        return ARTransformer(cfg.model, cfg.data.vocab, sample_len(cfg))
     return build_ncm(cfg, codec)
 
 def blocks_of(net):

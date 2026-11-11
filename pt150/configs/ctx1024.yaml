@@ -1,0 +1,5 @@
+# LLM-shaped stage 0: 1024-token samples = 976 raw-token prefix + one 48-token codec block.
+# ncm: prefix via codec token embedding (upstream raw_token_prefix path), predicts the block's 196 codes.
+# ar: trains on all 1024 tokens; log/eval field block_nats_per_token = loss on the same 48 block positions.
+data: {prefix: 976}
+train: {global_bs: 64, micro_bs: 4}   # 64 x 1024 = 65.5k text tokens per step

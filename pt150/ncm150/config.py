@@ -9,6 +9,10 @@ def load_cfg(*files, overrides=()):
     parts.append(OmegaConf.from_dotlist(list(overrides)))
     return OmegaConf.merge(*parts)
 
+def sample_len(cfg):
+    """text tokens per sample: raw prefix + one codec block (data.window)"""
+    return int(cfg.data.get("prefix") or 0) + int(cfg.data.window)
+
 def levels_of(cfg):
     c = cfg.codec
     return [int(l) for l in c.levels] if c.get("levels") else [i * i for i in range(1, int(c.n_levels) + 1)]

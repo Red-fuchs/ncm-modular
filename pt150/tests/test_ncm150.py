@@ -45,22 +45,23 @@ def test_full_size_params_near_150m():
 
 def _pairs_from_mask(net): return int(net.attn_mask_for_masking.sum())
 
+@pytest.mark.parametrize("prefix", [0, 8])
 @pytest.mark.parametrize("arm", ["ar", "ncm"])
-def test_flops_formula_matches_counter(arm, tiny_data, tmp_path):
-    c = tiny_cfg(arm, tiny_data, tmp_path, "model.dropout=0.0"); m = c.model; d, nl = m.n_embd, m.n_layer
+def test_flops_formula_matches_counter(arm, prefix, tiny_data, tmp_path):
+    c = tiny_cfg(arm, tiny_data, tmp_path, "model.dropout=0.0", f"data.prefix={prefix}"); m = c.model; d, nl = m.n_embd, m.n_layer
     if arm == "ar":
-        net = build_model(c).eval(); x = torch.randint(0, 128, (1, 16)); T = 16
+        T = 16 + prefix; net = build_model(c).eval(); x = torch.randint(0, 128, (1, T))
         meas = fl.measure_fwd(lambda: net(x))
         full = fl.ar_fwd_flops(m, 128, T, dense_attn=True)
         assert meas in (full, full - 4 * nl * d * T * T)  # older torch: CPU FlopCounterMode skips SDPA; >= 2.15 counts it
         assert fl.ar_pairs(T) == T * (T + 1) // 2
     else:
-        cod = build_codec(c); net = build_model(c, cod).eval(); L = levels_of(c); S = 1 + sum(L[1:])
+        P = 1 + prefix; cod = build_codec(c); net = build_model(c, cod).eval(); L = levels_of(c); S = P + sum(L[1:])
         x = torch.randn(1, S, c.codec.embed_dim); meas = fl.measure_fwd(lambda: net(x))
-        full = fl.ncm_fwd_flops(m, L, c.codec.embed_dim, c.codec.vocab, 1, True, dense_attn=True)
+        full = fl.ncm_fwd_flops(m, L, c.codec.embed_dim, c.codec.vocab, P, True, dense_attn=True)
         assert meas in (full, full - 4 * nl * d * S * S)
-        assert fl.ncm_pairs(1, L) == _pairs_from_mask(net)
-        assert fl.ncm_pairs(1, L) < S * S
+        assert fl.ncm_pairs(P, L) == _pairs_from_mask(net)
+        assert fl.ncm_pairs(P, L) < S * S
 
 def test_train_flops_and_plan(tiny_data, tmp_path):
     ca, cn = tiny_cfg("ar", tiny_data, tmp_path), tiny_cfg("ncm", tiny_data, tmp_path)
@@ -82,10 +83,11 @@ def test_data_order_identical_across_arms(tiny_data, tmp_path):
     # the first N samples both arms consume come from the same stream regardless of micro-batching
     assert torch.equal(torch.cat([s1.batch(0, 2), s1.batch(2, 2)]), s1.batch(0, 4))
 
+@pytest.mark.parametrize("prefix", [0, 8])
 @pytest.mark.parametrize("arm", ["ar", "ncm"])
-def test_resume_determinism(arm, tiny_data, tmp_path):
+def test_resume_determinism(arm, prefix, tiny_data, tmp_path):
     N, k = 8, 3
-    ex = ["budget.tokens=%d" % (N * 4 * 16), "train.ckpt_every=1", "train.eval_every=4"]
+    ex = ["budget.tokens=%d" % (N * 4 * (16 + prefix)), "train.ckpt_every=1", "train.eval_every=4", f"data.prefix={prefix}"]
     a = train(tiny_cfg(arm, tiny_data, tmp_path / "full", *ex), stop_after=None)
     assert a["step"] == N
     b1 = train(tiny_cfg(arm, tiny_data, tmp_path / "split", *ex), stop_after=k); assert b1["step"] == k
@@ -136,6 +138,20 @@ def test_codec_flops_and_encode_on_accelerator(tiny_data, tmp_path):
     assert fl.train_flops_per_window(c, cod) > 0  # dummy encode input must live on the codec's device
     x = torch.randint(0, 128, (2, 16))
     assert torch.equal(cod.encode(x.to(_ACC)).cpu(), cod.cpu().encode(x))
+
+def test_prefix_changes_ncm_and_ar_block_loss(tiny_data, tmp_path):
+    from ncm150.train import Task
+    for arm in ("ar", "ncm"):
+        c = tiny_cfg(arm, tiny_data, tmp_path, "data.prefix=8", "model.dropout=0.0", "codec.dropout=0.0")
+        t = Task(c, torch.device("cpu")); t.net.eval()
+        a = torch.randint(0, 128, (2, 24)); b = a.clone(); b[:, :8] = (b[:, :8] + 1) % 128   # same block, other prefix
+        with torch.no_grad(): la, ea = t.loss(a); lb, eb = t.loss(b)
+        assert not torch.isclose(la, lb), arm          # the block prediction must depend on the prefix
+        assert set(ea) == {"block_nats_per_token" if arm == "ar" else "code_nats_per_text_token"}
+
+def test_ctx1024_config():
+    c = load_cfg("ncm_150m.yaml", "ctx1024.yaml"); from ncm150.config import sample_len
+    assert sample_len(c) == 1024 and c.data.window == 48 and fl.plan_steps(c, 1.0)[2] == 64 * 1024
 
 def test_ffn_extension_point_guard(tiny_data, tmp_path):
     with pytest.raises(NotImplementedError): build_model(tiny_cfg("ar", tiny_data, tmp_path, "model.ffn=moe"))

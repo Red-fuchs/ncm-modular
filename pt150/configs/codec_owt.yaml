@@ -4,4 +4,4 @@ data: {window: 1024}
 codec: {name: owt, checkpoint: artifacts/owt/tokenizer.pt, sha256: null, levels: null, n_levels: 32, vocab: 8192, dropout: 0.3,
         pre_quant_dropout: 0.0, vq: {learned_l1_cascade_norm: false, learned_l1_cascade_norm_final: false}}
 train: {global_bs: 64, micro_bs: 4}
-# smoke_4080s.yaml assumes 48-token windows (global_bs 336); with owt pass train.global_bs=16 train.micro_bs=1.
+# smoke_4080s.yaml assumes 48-token windows (global_bs 336); with owt pass train.global_bs=16 train.micro_bs=1. Not combinable with ctx1024.yaml.

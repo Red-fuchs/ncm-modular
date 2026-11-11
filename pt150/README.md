@@ -13,6 +13,12 @@ for targets; the OWT codec is not published upstream yet, see Codec). Extension 
   = summed code CE / 48, NOT the same quantity as AR nats/token. Cross-arm quality needs generation eval (upstream `evaluate.py`, gen-ppl; not wired here).
 - Size: non-embedding params by upstream `count_params` (excludes wte/wle/wpe): AR 12L d1024 = 151.2M; NCM 11L d1024 = 145.3M
   (8 heads + 8 post-upsample convs included). `ncm_150m_blocks12.yaml`: same 12 blocks as AR, 157.9M.
+- **`--ctx1024` (LLM-shaped, the comparison that matters for scaling):** samples are 1024 tokens = 976 raw-token prefix + one
+  48-token codec block. NCM: prefix = BOS + 976 tokens through the codec's token embedding (upstream `raw_token_prefix` path, so
+  upstream `generate()` can use the trained model), predicts the block's 196 codes. AR: causal over all 1024, trains on all of
+  them (its normal regime); `block_nats_per_token` = AR loss on the same 48 block positions. Per sample NCM supervises 48 text
+  tokens, AR 1024: that data-efficiency gap is part of what is measured. Per 1024-token sample: AR 1.32 TFLOP, NCM 1.14 TFLOP
+  (incl. codec encode; dense SDPA: 1.40 / 1.17). Default (no flag): 48-token samples, BOS-only prefix (plumbing smoke).
 - Compute matching: `ncm150/flops.py`. 6ND-style: train = 3 x fwd, 2 FLOPs per MAC, matmul work + attention over *allowed* pairs;
   ncm also pays the online codec encode. Per 48-token window (computed, not measured): AR 58.5 GFLOP, NCM 168.8 GFLOP incl. codec encode (2.9x;
   plain masked SDPA counts dense attention: 173.2 GFLOP, only 2.6 % more at this length, so `ncm.flex_attention=false` is a safe fallback).
@@ -34,7 +40,9 @@ the only published codec with GPT-2 BPE. The OWT codec (1024 ctx) the harness wa
 
 ## Run
 ```
-./run.sh ncm --smoke       # run this first if you only have time for one (flex-attention path)
+./run.sh ncm --smoke       # plumbing/throughput smoke, 48-token samples (flex-attention path)
+./run.sh ncm --ctx1024 --smoke   # LLM-shaped smoke: 976-token prefix + 48-token block, 16 x 1024 tok/step, micro_bs 2
+./run.sh ar --ctx1024 --smoke    # same for AR; main runs: ./run.sh <arm> --ctx1024 [budget.flops=...]
 ./run.sh ar --smoke        # each smoke: ~1 h cap (train.max_minutes=70), flops budget 2e16, global_bs 336 windows (16k tok)
 ./run.sh ar                # main: edit budget.flops (default 1e18) or pass budget.flops=3e18 ...
 ./run.sh ncm budget.flops=3e18
@@ -61,7 +69,8 @@ Send back: `tar czf logs_<arm>_<host>.tgz runs/*/log.jsonl && nvidia-smi -q > gp
 - Nothing here ran on CUDA. Flex attention path (`ncm.flex_attention=true`) and `train.compile` are untested; fallback is plain SDPA with a bool mask (+2.6 % NCM FLOPs at 48 tokens; the smoke overlay uses `micro_bs=16` + `grad_ckpt`, tune for VRAM).
 - Codec not retrained on FineWeb-Edu: uses the upstream XSum codec (GPT-2 tokenizer, 48 ctx, built for XSum news summaries of <= 48 tokens). Exact round trip
   on FineWeb-Edu text is not measured here; a 2-sentence news check decodes 100 %.
-- 48-token context for both arms, so this compares short-context modeling only. When upstream publishes `owt/tokenizer.pt`:
+- Default mode is 48-token context for both arms (short-context only); use `--ctx1024` for the long-prefix comparison.
+  One codec block per sample (as upstream); multi-block samples (block-causal across blocks) would give NCM more targets per sample. When upstream publishes `owt/tokenizer.pt`:
   `./fetch_codec.sh owt`, then see the header of `configs/codec_owt.yaml` (1024 ctx, 32 levels, ncm `model.n_layer=10`).
 - MPS (Apple Silicon): codec encode + FLOP setup tested on MPS (pytest); train loop and throughput not measured there.
 - No generation-quality eval; no MoE / per-level experts yet (hooks only); no multi-GPU.

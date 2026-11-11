@@ -8,7 +8,8 @@ data:
   dir: data/fineweb_edu_gpt2 # train_*.bin / val.bin uint16 GPT-2 token shards (see prep_data.py)
   hf_name: HuggingFaceFW/fineweb-edu
   hf_config: sample-10BT
-  window: 48                 # text tokens per sample (= codec context length; xsum codec: 48)
+  window: 48                 # codec block = text tokens the ncm arm predicts (= codec context length; xsum codec: 48)
+  prefix: 0                  # raw text tokens before the block (sample = prefix + window); ctx1024.yaml sets 976
   eos_id: 50256              # doc separator AND unconditional prefix token (BOS)
   vocab: 50304               # GPT-2 vocab padded
   val_windows: 256
