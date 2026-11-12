@@ -8,6 +8,8 @@ from torch.nn import functional as F
 try:
     from torch.nn.attention.flex_attention import flex_attention as _flex_attention
     HAS_FLEX_ATTENTION = True
+    # LOCAL: eager flex_attention materializes scores and is very slow on CUDA; compile it (CPU/MPS stay eager).
+    _flex_attention_cuda = torch.compile(_flex_attention, dynamic=False)
 except ImportError:
     _flex_attention = None
     HAS_FLEX_ATTENTION = False
@@ -125,7 +127,7 @@ class SelfAttention(nn.Module):
             if q.dtype != v.dtype:
                 q = q.to(v.dtype)
                 k = k.to(v.dtype)
-            y = _flex_attention(q, k, v, block_mask=block_mask)
+            y = (_flex_attention_cuda if q.is_cuda else _flex_attention)(q, k, v, block_mask=block_mask)  # LOCAL
         else:
             # Causal only for multiple tokens with no explicit mask; a cached single token sees all.
             use_causal = True if attn_mask is None and T > 1 else False

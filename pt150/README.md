@@ -63,10 +63,12 @@ Send back: `tar czf logs_<arm>_<host>.tgz runs/*/log.jsonl && nvidia-smi -q > gp
 | H100 80GB | ar | TBD | TBD | TBD | TBD |
 | H100 80GB | ncm (flex) | TBD | TBD | TBD | TBD |
 | RTX 4080S 16GB | ar | TBD | TBD | TBD | TBD |
-| RTX 4080S 16GB | ncm (flex, grad_ckpt) | TBD | TBD | TBD | TBD |
+| RTX 4080 16GB | ncm (compiled flex, no grad_ckpt) | 56 | ~10.9k | ~38 | 9.7 GB |
 
 ## Known gaps
-- Nothing here ran on CUDA. Flex attention path (`ncm.flex_attention=true`) and `train.compile` are untested; fallback is plain SDPA with a bool mask (+2.6 % NCM FLOPs at 48 tokens; the smoke overlay uses `micro_bs=16` + `grad_ckpt`, tune for VRAM).
+- CUDA: community run on an RTX 4080 (sweep + logs: https://gist.github.com/granman3/15d49ea081464c8bf73321b496d99901): compiled flex_attention +
+  `micro_bs=56`, no grad_ckpt -> ncm smoke 9 min instead of 54, val_loss unchanged (5.876 vs 5.875). flex_attention is now compiled on CUDA
+  automatically. `train.compile=true` (whole-model `net.compile()`) is wired but still unmeasured. Fallback: plain SDPA with a bool mask (+2.6 % NCM FLOPs at 48 tokens).
 - Codec not retrained on FineWeb-Edu: uses the upstream XSum codec (GPT-2 tokenizer, 48 ctx, built for XSum news summaries of <= 48 tokens). Exact round trip
   on FineWeb-Edu text is not measured here; a 2-sentence news check decodes 100 %.
 - Default mode is 48-token context for both arms (short-context only); use `--ctx1024` for the long-prefix comparison.

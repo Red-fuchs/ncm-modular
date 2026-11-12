@@ -1,4 +1,5 @@
 # ~1 h on RTX 4080 Super 16 GB. Same 150M architectures, tiny budget. 336 windows x 48 tok = 16k text tok/step.
-# micro_bs: ncm sequence = 1 + 196 codes per window; raise micro_bs if VRAM allows (must divide 336).
-train: {global_bs: 336, micro_bs: 16, grad_ckpt: true, eval_every: 50, ckpt_every: 50, eval_windows: 336, max_minutes: 70}
+# micro_bs: ncm sequence = 1 + 196 codes per window (must divide 336). 56 without grad_ckpt = 9.7 GB, fastest in the
+# community sweep (gist.github.com/granman3/15d49ea081464c8bf73321b496d99901).
+train: {global_bs: 336, micro_bs: 56, grad_ckpt: false, eval_every: 50, ckpt_every: 50, eval_windows: 336, max_minutes: 70}
 budget: {mode: flops, flops: 2.0e16}

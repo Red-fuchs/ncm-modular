@@ -89,7 +89,7 @@ def train(cfg, resume=True, stop_after=None):
     opt = torch.optim.AdamW([dict(params=dec, weight_decay=tc.weight_decay), dict(params=nod, weight_decay=0.0)], lr=tc.lr,
                             betas=tuple(tc.betas), fused=dev.type == "cuda")
     ac = (lambda: torch.autocast(dev.type, dtype=torch.bfloat16)) if (cfg.precision == "bf16" and dev.type == "cuda") else contextlib.nullcontext
-    fwd = torch.compile(task.net) if tc.compile else None
+    if tc.compile: net.compile()  # in-place: task.loss uses it, state_dict keys stay unprefixed
     step, ck = 0, os.path.join(out, "last.pt"); logp = os.path.join(out, "log.jsonl")
     if resume and os.path.exists(ck):
         step = load_ckpt(ck, task, opt)
