@@ -65,6 +65,30 @@ Send back: `tar czf logs_<arm>_<host>.tgz runs/*/log.jsonl && nvidia-smi -q > gp
 | RTX 4080S 16GB | ar | TBD | TBD | TBD | TBD |
 | RTX 4080 16GB | ncm (compiled flex, no grad_ckpt) | 56 | ~10.9k | ~38 | 9.7 GB |
 
+## Long-text generation + safe-token masking (English first: XSum codec; German later)
+Port of the MLX block-seam / safe-token experiments (`src/ncm_modular/seam/`, `ncm-test/seam/safe_eval.py`). Inference only, no retraining; works on `--ctx1024` checkpoints (`data.prefix=976`) and on the 48-token default (prefix 0 = no history, plumbing only).
+- `ncm150/generate.py`: sliding-window generation, one block (`data.window` = 48 tokens) at a time. Each block sees `[BOS] + table tokens + last K raw tokens` (K = `data.prefix`).
+  NCM: level-0 codes drawn uniformly, NCM levels sampled (`temp/top_k/top_p`), codec decode, argmax. AR: same window, token-by-token sampling. Same API and same mask for both arms.
+  `table_slots=0` (default) keeps the table out of the prefix (works with current checkpoints); `>0` only makes sense for a model trained with table tokens in the prefix (not implemented in train.py yet).
+- `ncm150/safe.py`: entity table = ordered English names seen so far (prompt + earlier blocks; single-token GPT-2 names from a ~330-word list, `SURROGATES` = 16 common first names). Modes at decode:
+  `none` plain, `mask` name tokens not in the table get -inf, `slot` if the pick is a disallowed name take the best allowed (table) name, else fall back to mask. Pure functions on logits.
+- `ncm150/eval_long.py`: JSON metrics per mode.
+```
+cd pt150
+python -m ncm150.eval_long --ckpt runs/ncm/last.pt --ref runs/ar/last.pt --modes none mask slot --n 64 --blocks 8 --out runs/ncm/long.json
+python -m ncm150.eval_long --ckpt runs/ar/last.pt --modes none mask slot --out runs/ar/long.json      # AR arm, PPL under itself
+python -m ncm150.eval_long --config cpu_tiny.yaml --set arm=ncm data.prefix=8 device=cpu --synthetic-names --prompts random --n 4 --blocks 2   # random-init smoke
+```
+Prompts = windows of the val shard (`data.dir/val.bin`, length `--prompt-len`, default max(prefix, window)); `--prompts random` for smoke tests. GPU-heavy runs on the shared box: wrap in `gpu-run`.
+| metric | meaning |
+|---|---|
+| `invented_rate` | name mentions in generated blocks whose name was not in the table before that block / all name mentions (`invented_texts` = share of texts with >= 1) |
+| `carry_over` | share of names in the prompt that reappear in the generated text (texts whose prompt has a name) |
+| `seam_doubling` | share of seams (prompt->block 1, block n->n+1) where last word == first word of the next block |
+| `ppl_ref` | within-text PPL of the generated tokens under the reference AR (`--ref`, default: the model itself if AR), sliding window, same K |
+| `name_hit_rate` | decode positions where the unconstrained argmax was a disallowed name (per generated text token) |
+Limits: names are only detected from the list (multi-token and unlisted names are invisible); the corpus is not surrogate-masked as in the MLX run, so raw names are blocked rather than renamed; `ppl_ref` rewards AR-like text. Tested on CPU with tiny random-init models only (CUDA and the real XSum codec untested).
+
 ## Known gaps
 - CUDA: community run on an RTX 4080 (sweep + logs: https://gist.github.com/granman3/15d49ea081464c8bf73321b496d99901): compiled flex_attention +
   `micro_bs=56`, no grad_ckpt -> ncm smoke 9 min instead of 54, val_loss unchanged (5.876 vs 5.875). flex_attention is now compiled on CUDA
@@ -75,4 +99,4 @@ Send back: `tar czf logs_<arm>_<host>.tgz runs/*/log.jsonl && nvidia-smi -q > gp
   One codec block per sample (as upstream); multi-block samples (block-causal across blocks) would give NCM more targets per sample. When upstream publishes `owt/tokenizer.pt`:
   `./fetch_codec.sh owt`, then see the header of `configs/codec_owt.yaml` (1024 ctx, 32 levels, ncm `model.n_layer=10`).
 - MPS (Apple Silicon): codec encode + FLOP setup tested on MPS (pytest); train loop and throughput not measured there.
-- No generation-quality eval; no MoE / per-level experts yet (hooks only); no multi-GPU.
+- Generation eval is mechanical only (names/seams/PPL, see above), no judge; no MoE / per-level experts yet (hooks only); no multi-GPU.
