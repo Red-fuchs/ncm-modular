@@ -4,5 +4,6 @@ omegaconf
 hydra-core
 datasets
 transformers
+tiktoken            # ncm150.eval_long (GPT-2 name set)
 huggingface_hub[cli]
 pytest
